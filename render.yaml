@@ -1,0 +1,84 @@
+services:
+  - type: web
+    name: geekonsites-v2-backend
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+          name: geekonsites-v2-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: geekonsites-v2-postgres
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: geekonsites-v2-postgres
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: geekonsites-v2-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: geekonsites-v2-postgres
+          property: password
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: GeekOnSites Support
+      - key: SUPPORT_EMAIL
+        value: support@gos.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: PASSWORD_RESET_ALLOWED_ORIGINS
+        value: https://geekonsites.com,https://www.geekonsites.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://geekonsites.com,https://www.geekonsites.com
+      - key: STRIPE_SUCCESS_URL
+        value: https://geekonsites.com/payment-success
+      - key: STRIPE_CANCEL_URL
+        value: https://geekonsites.com/payment
+      - key: GOOGLE_CALENDAR_ENABLED
+        value: "true"
+      - key: GOOGLE_CALENDAR_OAUTH_CLIENT_JSON
+        sync: false
+      - key: GOOGLE_CALENDAR_REFRESH_TOKEN
+        sync: false
+      - key: GOOGLE_CALENDAR_ID
+        value: primary
+      - key: GOOGLE_CALENDAR_TIME_ZONE
+        value: UTC
+      - key: FIREBASE_ENABLED
+        value: "true"
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+
+databases:
+  - name: geekonsites-v2-postgres
+    databaseName: geekonsites
+    user: geekonsites
+    plan: free
+    postgresMajorVersion: "17"
+    ipAllowList: []
