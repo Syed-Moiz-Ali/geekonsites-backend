@@ -5,12 +5,9 @@ import com.geekonsites.backend.entity.Booking;
 import java.time.LocalDateTime;
 
 /**
- * PHASE 10 (local-e2e) — the boundary for creating a remote-support meeting.
- *
- * <p>Production uses the real Google Calendar implementation
- * ({@link GoogleCalendarService}); the {@code local-e2e} profile substitutes a
- * deterministic local provider. Only the external provider boundary moves — all
- * lifecycle/persistence logic stays in {@link RemoteSessionProvisioningService}.
+ * Boundary for creating a remote-support meeting. The production implementation is the
+ * Google Calendar one ({@link GoogleCalendarService}); all lifecycle/persistence logic
+ * stays in {@link RemoteSessionProvisioningService}.
  */
 public interface RemoteMeetingProvider {
 

@@ -274,7 +274,10 @@ public class RefundService {
                 continue;
             }
             if (existing != null && existing.getStatus() == PaymentRefundStatus.PENDING) {
-                // Already reserved by an earlier attempt; re-queue for provider processing.
+                // Already reserved by an earlier attempt; re-queue for provider processing and
+                // count its amount against the outstanding requested total (otherwise a retry
+                // after a provider failure would be unable to re-drive the refund).
+                remainingMinor -= Math.min(existing.getAmountMinor(), remainingMinor);
                 queue.add(new ReservedAllocation(existing, transaction));
                 continue;
             }

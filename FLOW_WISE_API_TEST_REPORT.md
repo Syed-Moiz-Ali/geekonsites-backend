@@ -1,4 +1,4 @@
-# FLOW-WISE API TEST REPORT — GeekOnSites Backend
+# FLOW-WISE API TEST REPORT --- GeekOnSites Backend
 
 Real, chained HTTP testing against the locally running Spring Boot backend
 (production profile, real PostgreSQL 17.11, Flyway ON, `ddl-auto=validate`),
@@ -13,14 +13,14 @@ same flows): see `LOCAL_BACKEND_FLOW_TESTING.md`.
 
 | Check | Result |
 | --- | --- |
-| Java | 17.0.12 — PASS |
-| Maven | 3.9.16 — PASS |
-| PostgreSQL | 17.11 local cluster (port 55432) — PASS |
-| Flyway | Successfully validated/applied 4 migrations; current version 4 — PASS |
-| Hibernate | `ddl-auto=validate`, app started, no schema mutation — PASS |
-| Catalog seed | 34 services / 68 add-ons (37 in US list after admin test services) — PASS |
-| Backend startup | `Started GeekOnSitesApplication`; `/api/health` 200 — PASS |
-| `psql` / `jq` | not installed here (SQL via JDBC; live run via PowerShell) — noted |
+| Java | 17.0.12 --- PASS |
+| Maven | 3.9.16 --- PASS |
+| PostgreSQL | 17.11 local cluster (port 55432) --- PASS |
+| Flyway | Successfully validated/applied 4 migrations; current version 4 --- PASS |
+| Hibernate | `ddl-auto=validate`, app started, no schema mutation --- PASS |
+| Catalog seed | 34 services / 68 add-ons (37 in US list after admin test services) --- PASS |
+| Backend startup | `Started GeekOnSitesApplication`; `/api/health` 200 --- PASS |
+| `psql` / `jq` | not installed here (SQL via JDBC; live run via PowerShell) --- noted |
 
 ---
 
@@ -61,8 +61,8 @@ same flows): see `LOCAL_BACKEND_FLOW_TESTING.md`.
 | 12.2 | Approve technician | PUT | /api/technicians/{id}/approve | admin | 200 | 200 | PASS |
 | 12.3 | Login after approval | POST | /api/auth/login | none | 200 | 200 | PASS |
 | 12.4 | Set availability | PUT | /api/technicians/me/availability | technician | 200 | 200 | PASS |
-| 13.1 | Assign technician | PUT | /api/bookings/{id}/assign-technician/{t} | admin | — | — | **BLOCKED** |
-| 14-31 | Lifecycle/tracking/invoice/rating/refund/remote | — | multiple | — | — | — | **BLOCKED** |
+| 13.1 | Assign technician | PUT | /api/bookings/{id}/assign-technician/{t} | admin | --- | --- | **BLOCKED** |
+| 14-31 | Lifecycle/tracking/invoice/rating/refund/remote | --- | multiple | --- | --- | --- | **BLOCKED** |
 | 31b.1 | Onsite remote-provision rejected | POST | /api/bookings/{id}/remote-session/provision | customer | 400 | 400 | PASS |
 | 32.1 | Admin creates agent | POST | /api/agents | admin | 200 | 200 | PASS |
 | 32.2 | Agent login | POST | /api/auth/login | none | 200 | 200 | PASS |
@@ -103,77 +103,77 @@ No ids/JWTs were pasted between steps.
 
 ## Detailed flow sections
 
-### FLOW 1–2 — CUSTOMER AUTHENTICATION / SECOND CUSTOMER
-Register/Login PASS · JWT extracted · identity matches · 401 without/invalid token PASS ·
+### FLOW 1---2 --- CUSTOMER AUTHENTICATION / SECOND CUSTOMER
+Register/Login PASS -- JWT extracted -- identity matches -- 401 without/invalid token PASS --
 ownership anchor (customer B) created.
 
-### FLOW 3 — SERVICE DISCOVERY
-US list PASS (37 services) · UK list PASS (GBP, e.g. `9.00`) · invalid market 400 PASS ·
+### FLOW 3 --- SERVICE DISCOVERY
+US list PASS (37 services) -- UK list PASS (GBP, e.g. `9.00`) -- invalid market 400 PASS --
 selected ONSITE `LAPTOP_REPAIR` (id 14) and REMOTE `PC_HEALTH_CHECK_DIAGNOSIS` dynamically.
 
-### FLOW 4 — CREATE ON-SITE BOOKING
+### FLOW 4 --- CREATE ON-SITE BOOKING
 Created booking id 9: mode ONSITE, currency USD, `totalAmountMinor=14100`,
 `advanceAmountMinor=4230`, status PENDING. My-bookings contains it; detail matches;
 DB row verified (Bookings count increased). Price came from the DB catalog.
 
-### FLOW 5 — BOOKING OWNERSHIP
-Customer B read/mutate → 403; Customer A read → 200. PASS.
+### FLOW 5 --- BOOKING OWNERSHIP
+Customer B read/mutate --- 403; Customer A read --- 200. PASS.
 
-### FLOW 6 — BOOKING VALIDATION
-Invalid service 400 · invalid date 400 · malformed JSON 400 · no row created. PASS.
+### FLOW 6 --- BOOKING VALIDATION
+Invalid service 400 -- invalid date 400 -- malformed JSON 400 -- no row created. PASS.
 
-### FLOW 7–9 — PAYMENT
-Pre-assignment guard: assigning before payment → 400 PASS.
-**FLOW 8/9: BLOCKED — EXTERNAL STRIPE TEST PROVIDER NOT CONFIGURED.** Checkout returned 500
+### FLOW 7---9 --- PAYMENT
+Pre-assignment guard: assigning before payment --- 400 PASS.
+**FLOW 8/9: BLOCKED --- EXTERNAL STRIPE TEST PROVIDER NOT CONFIGURED.** Checkout returned 500
 (empty Stripe key; the response body is the generic `INTERNAL_ERROR` with no key leaked). No
 paid state was faked and no legacy mark-paid path was used.
 
-### FLOW 10 — ADMIN
+### FLOW 10 --- ADMIN
 Admin login via `/api/admin/auth/login` PASS (main portal correctly rejects admin with 403).
 Admin-only list 200; customer 403. PASS.
 
-### FLOW 11–12 — TECHNICIAN REGISTRATION / APPROVAL
+### FLOW 11---12 --- TECHNICIAN REGISTRATION / APPROVAL
 Registered (`verificationStatus=PENDING`, `availability=UNAVAILABLE`). Login before approval 403.
 Unverified assignment rejected 400. Admin approve 200. Login after approval 200.
 Availability set `AVAILABLE` 200. PASS.
 
-### FLOW 13 — ASSIGN TECHNICIAN
-**BLOCKED** — assignment requires a confirmed payment (Stripe unavailable).
+### FLOW 13 --- ASSIGN TECHNICIAN
+**BLOCKED** --- assignment requires a confirmed payment (Stripe unavailable).
 
-### FLOWS 14–31 — LIFECYCLE / TRACKING / COMPLETION / INVOICE / RATING / REMAINING / REFUND / REMOTE
-**BLOCKED** — the entire post-payment chain requires a Stripe-confirmed payment.
-Testable pre-payment guard: on-site booking remote-provision → 400 PASS.
+### FLOWS 14---31 --- LIFECYCLE / TRACKING / COMPLETION / INVOICE / RATING / REMAINING / REFUND / REMOTE
+**BLOCKED** --- the entire post-payment chain requires a Stripe-confirmed payment.
+Testable pre-payment guard: on-site booking remote-provision --- 400 PASS.
 
-### FLOW 32 — AGENT
+### FLOW 32 --- AGENT
 Admin creates agent PASS; agent login PASS; CRM summary/customers PASS; agent correctly
 denied service pricing (403) and rating (403).
 
-### FLOW 33 — ADMIN SERVICE MANAGEMENT
+### FLOW 33 --- ADMIN SERVICE MANAGEMENT
 Create/update/deactivate PASS; deactivated service hidden from public catalog PASS;
 booking against deactivated service rejected 400 PASS.
 
-### FLOW 34 — ADMIN LIST APIS
+### FLOW 34 --- ADMIN LIST APIS
 Customers/refunds/operations endpoints 200 with pagination. PASS.
 
-### FLOW 35 — CONTACT / SUPPORT
+### FLOW 35 --- CONTACT / SUPPORT
 Public create PASS; agent list/detail/status PASS; customer forbidden 403 PASS.
 
-### FLOW 36 — ROLE MATRIX NEGATIVES
-Technician cannot create booking/rate · customer cannot price service · admin main-portal
+### FLOW 36 --- ROLE MATRIX NEGATIVES
+Technician cannot create booking/rate -- customer cannot price service -- admin main-portal
 login blocked. All 403 PASS.
 
-### FLOW 37 — STANDARD ERROR CONTRACT
+### FLOW 37 --- STANDARD ERROR CONTRACT
 400/401/403/404/409 all return `ApiErrorResponse`
 (`timestamp,status,error,code,message,path,fieldErrors`). Sample 404:
 `{"code":"RESOURCE_NOT_FOUND","message":"Booking not found",...}`. PASS.
 
-### FLOW 38 — PAGINATION
+### FLOW 38 --- PAGINATION
 page0/page1/empty/invalid-page/oversized. `size=1000000` capped to **100**; empty page returns
 empty content. PASS.
 
 ---
 
-## FLOW 39 — DATABASE INVARIANTS (PostgreSQL)
+## FLOW 39 --- DATABASE INVARIANTS (PostgreSQL)
 
 | Invariant | Violations |
 | --- | --- |
@@ -187,16 +187,16 @@ empty content. PASS.
 
 **DATABASE INVARIANTS: PASS**
 
-## FLOW 40 — RESTART
+## FLOW 40 --- RESTART
 
 Stopped and restarted against the SAME DB: Flyway **validated 4 migrations** and did **not**
 re-run; catalog **not** duplicated (0 new seeds); Hibernate validate passed; health 200;
 admin list and public catalog still 200; existing rows remain. **PASS**
 
-## FLOW 41 — MAVEN REGRESSION
+## FLOW 41 --- MAVEN REGRESSION
 
-* `mvn -B clean test` → **345 tests, 0 failures, 0 errors, 1 skipped — BUILD SUCCESS**
-* `mvn -B verify` → **BUILD SUCCESS** (jar built)
+* `mvn -B clean test` --- **345 tests, 0 failures, 0 errors, 1 skipped --- BUILD SUCCESS**
+* `mvn -B verify` --- **BUILD SUCCESS** (jar built)
 
 ---
 
@@ -212,8 +212,8 @@ admin list and public catalog still 200; existing rows remain. **PASS**
 | B6 | Onboarding | POST /api/technicians/onboarding/set-password (bad token) | 500 | `IllegalArgumentException` | `ResponseStatusException(400)` | `ErrorContractFixesIntegrationTest` |
 | B7 | Remote provision | POST /api/bookings/{id}/remote-session/provision (unpaid) | 500 | generic `RuntimeException` | `ResponseStatusException(409)` | `ErrorContractFixesIntegrationTest` |
 | B8 | Resend onboarding | POST /api/technicians/{id}/resend-onboarding (non-approved) | 500 | generic `RuntimeException` | `ResponseStatusException(409)` | covered |
-| B9 | Booking meeting-link | PUT /api/bookings/{id}/meeting-link | non-technician reached it → 500 | missing SecurityConfig matcher | matcher `hasRole("TECHNICIAN")` | existing security tests |
-| B10 | Stripe webhook | POST /api/payments/webhook (no signature header) | 500 | `MissingRequestHeaderException` unhandled | global handler → 400 | `ErrorContractFixesIntegrationTest` |
+| B9 | Booking meeting-link | PUT /api/bookings/{id}/meeting-link | non-technician reached it --- 500 | missing SecurityConfig matcher | matcher `hasRole("TECHNICIAN")` | existing security tests |
+| B10 | Stripe webhook | POST /api/payments/webhook (no signature header) | 500 | `MissingRequestHeaderException` unhandled | global handler --- 400 | `ErrorContractFixesIntegrationTest` |
 
 All three regressions were re-verified live after restart; no unrelated refactoring was done.
 
@@ -221,11 +221,11 @@ All three regressions were re-verified live after restart; no unrelated refactor
 
 ## Provider-blocked flows (honest)
 
-* **PAYMENT / REMAINING PAYMENT / REFUND EXECUTION / SPLIT REFUND** — `BLOCKED — EXTERNAL STRIPE
+* **PAYMENT / REMAINING PAYMENT / REFUND EXECUTION / SPLIT REFUND** --- `BLOCKED --- EXTERNAL STRIPE
   TEST PROVIDER NOT CONFIGURED`. No Stripe test keys available; no fake succeeded.
-* **REMOTE SESSION (Google Meet/Calendar)** — `BLOCKED — GOOGLE TEST CREDENTIALS NOT
+* **REMOTE SESSION (Google Meet/Calendar)** --- `BLOCKED --- GOOGLE TEST CREDENTIALS NOT
   CONFIGURED` (reachable only after a paid remote booking).
-* **ON-SITE FULL LIFECYCLE (accept→arrived→start→complete→invoice→rating)** — blocked because it
+* **ON-SITE FULL LIFECYCLE (accept---arrived---start---complete---invoice---rating)** --- blocked because it
   requires a confirmed payment.
 
 ---
@@ -274,6 +274,4 @@ All three regressions were re-verified live after restart; no unrelated refactor
 * `mvn clean test`: **PASS** (345 / 0 / 0 / 1 skipped)
 * `mvn verify`: **PASS**
 
-(An additional isolated endpoint matrix of **113 endpoints** was also exercised: 62 success,
-49 controlled client errors, 2 provider-blocked, **0 server errors** — see
-`LOCAL_API_ENDPOINT_TEST_REPORT.md`.)
+(An additional isolated endpoint matrix of 113 endpoints was also exercised: 62 success, 49 controlled client errors, 2 provider-blocked, 0 server errors - see LOCAL_API_ENDPOINT_TEST_REPORT.md.)
