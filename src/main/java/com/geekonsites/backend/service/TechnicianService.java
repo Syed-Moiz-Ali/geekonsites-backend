@@ -239,11 +239,15 @@ public class TechnicianService {
     public TechnicianAdminResponse resendOnboarding(Long id) {
         Technician technician = getTechnicianById(id);
         if (!"APPROVED".equalsIgnoreCase(technician.getVerificationStatus())) {
-            throw new RuntimeException("Only approved technicians can receive an approval notification");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Only approved technicians can receive an approval notification");
         }
         String personalEmail = technician.getPersonalEmail();
         if (personalEmail == null || personalEmail.isBlank()) {
-            throw new RuntimeException("Technician personal email is missing");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Technician personal email is missing");
         }
         eventPublisher.publishEvent(new TechnicianApprovalEmailEvent(technician.getId(), personalEmail, technician.getName()));
         return TechnicianAdminResponse.from(technician);
@@ -252,21 +256,21 @@ public class TechnicianService {
     @Transactional
     public TechnicianSetPasswordResponse setOnboardingPassword(TechnicianSetPasswordRequest request) {
         if (request == null || request.token() == null || request.token().isBlank()) {
-            throw new IllegalArgumentException("Password setup link is invalid");
+            throw badRequest("Password setup link is invalid");
         }
         if (!isStrongPassword(request.password())) {
-            throw new IllegalArgumentException("Password must be 8 to 72 characters with uppercase, lowercase, number, and special character");
+            throw badRequest("Password must be 8 to 72 characters with uppercase, lowercase, number, and special character");
         }
         TechnicianOnboardingToken token = onboardingTokenRepository.findByTokenHash(hash(request.token()))
-                .orElseThrow(() -> new IllegalArgumentException("Password setup link is invalid"));
-        if (token.isUsed()) throw new IllegalArgumentException("Password setup link has already been used");
+                .orElseThrow(() -> badRequest("Password setup link is invalid"));
+        if (token.isUsed()) throw badRequest("Password setup link has already been used");
         if (!technicianRepository.existsByIdAndVerificationStatus(token.getTechnicianId(), "APPROVED")) {
-            throw new IllegalArgumentException("Technician account is not eligible for password setup");
+            throw badRequest("Technician account is not eligible for password setup");
         }
         if (token.getExpiresAt().isBefore(Instant.now())) {
             token.setUsed(true);
             onboardingTokenRepository.save(token);
-            throw new IllegalArgumentException("Password setup link has expired");
+            throw badRequest("Password setup link has expired");
         }
 
         User user = token.getUser();
@@ -277,6 +281,11 @@ public class TechnicianService {
         onboardingTokenRepository.invalidateActiveTokens(token.getTechnicianId());
         technicianRepository.markPasswordSetupComplete(token.getTechnicianId(), Instant.now());
         return new TechnicianSetPasswordResponse(user.getEmail(), "Your technician account is ready.");
+    }
+
+    private org.springframework.web.server.ResponseStatusException badRequest(String message) {
+        return new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, message);
     }
 
     private void publishNewOnboardingToken(Technician technician, User user) {

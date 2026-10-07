@@ -9,4 +9,6 @@ public interface RatingRepository
         extends JpaRepository<Rating, Long> {
 
     List<Rating> findByTechnicianId(Long technicianId);
+
+    boolean existsByBookingId(Long bookingId);
 }

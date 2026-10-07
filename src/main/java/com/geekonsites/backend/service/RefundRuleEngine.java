@@ -12,7 +12,8 @@ import java.util.Locale;
 public class RefundRuleEngine {
 
     public RefundAssessment assess(Booking booking, BigDecimal alreadyRefunded) {
-        BigDecimal paid = money(booking.getPaidAmount());
+        long paidMinor = PaymentMoney.resolveMinor(booking.getPaidAmountMinor(), booking.getPaidAmount());
+        BigDecimal paid = PaymentMoney.toMajorMoney(paidMinor);
         BigDecimal remainingCaptured = paid.subtract(alreadyRefunded == null ? BigDecimal.ZERO : alreadyRefunded)
                 .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         boolean uk = isUk(booking.getCountry());
@@ -52,10 +53,6 @@ public class RefundRuleEngine {
         if (country == null) return false;
         String value = country.trim().toUpperCase(Locale.ROOT);
         return value.equals("UK") || value.equals("GB") || value.equals("UNITED KINGDOM") || value.equals("GREAT BRITAIN");
-    }
-
-    private BigDecimal money(Double amount) {
-        return BigDecimal.valueOf(amount == null ? 0 : amount).setScale(2, RoundingMode.HALF_UP);
     }
 
     public record RefundAssessment(BigDecimal maximumRefundableAmount, String ruleContext) {}

@@ -25,7 +25,10 @@ $env:JWT_SECRET="a-random-secret-of-at-least-32-bytes"
 .\run-local.ps1
 ```
 
-Hibernate creates the current entity schema in a new empty database. Schema migrations will be versioned before production data is introduced.
+Schema is owned by versioned **Flyway** migrations in `src/main/resources/db/migration`
+(see `DATABASE_MIGRATION_RUNBOOK.md`). In production Hibernate runs with `ddl-auto=validate`
+and never mutates the schema; on a fresh database Flyway builds it from the migrations.
+Local default (no `production` profile) keeps `ddl-auto=update` for convenience.
 
 ## Render
 

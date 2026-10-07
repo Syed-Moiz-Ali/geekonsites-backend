@@ -104,8 +104,9 @@ class AgentCrmSecurityIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/agents/my-notifications").header("Authorization", bearer(technicianToken)))
                 .andExpect(status().isForbidden());
+        // PHASE 7: unauthenticated is 401 (standardized).
         mvc.perform(get("/api/agents/my-notifications"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test void realAgentLoginJwtAccessesEveryCrmRouteAndNotificationPolling() throws Exception {
@@ -142,8 +143,9 @@ class AgentCrmSecurityIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/contact").header("Authorization", bearer(technicianToken)))
                 .andExpect(status().isForbidden());
+        // PHASE 7: unauthenticated is 401 (standardized).
         mvc.perform(get("/api/contact"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test void agentDashboardSummaryUsesPersistedCountsAndServerDates() throws Exception {
@@ -228,7 +230,7 @@ class AgentCrmSecurityIntegrationTest {
     private void assertForbiddenForNonAgents(String path) throws Exception {
         mvc.perform(get(path).header("Authorization", bearer(customerToken))).andExpect(status().isForbidden());
         mvc.perform(get(path).header("Authorization", bearer(technicianToken))).andExpect(status().isForbidden());
-        mvc.perform(get(path)).andExpect(status().isForbidden());
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
     }
     private void getOk(String path,String token) throws Exception { mvc.perform(get(path).header("Authorization",bearer(token))).andExpect(status().isOk()); }
     private void getForbidden(String token) throws Exception { mvc.perform(get("/api/agent-crm/summary").header("Authorization",bearer(token))).andExpect(status().isForbidden()); }

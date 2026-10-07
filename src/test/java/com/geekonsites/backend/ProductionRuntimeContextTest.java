@@ -34,9 +34,9 @@ class ProductionRuntimeContextTest {
                 PaymentController.class, RefundController.class, AdminRefundController.class,
                 AgentCrmController.class, NotificationController.class, PushDeviceController.class,
                 RemoteSessionController.class, RemoteChatController.class, AdminController.class,
-                AgentController.class, ContactController.class, CustomerController.class,
+                AgentController.class, ContactController.class,
                 InvoiceController.class, RatingController.class, UserController.class,
-                HealthController.class, TestController.class
+                HealthController.class, AdminOperationsController.class
         };
         for (Class<?> controller : controllers) {
             assertNotNull(context.getBean(controller), () -> "Missing runtime bean: " + controller.getSimpleName());

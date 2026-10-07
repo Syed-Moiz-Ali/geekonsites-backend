@@ -111,7 +111,7 @@ class RemoteSessionProvisioningServiceTest {
     private Fixture fixture(Booking booking) {
         BookingRepository repository = mock(BookingRepository.class);
         GoogleCalendarService google = mock(GoogleCalendarService.class);
-        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(booking));
+        when(repository.findById(1L)).thenReturn(Optional.of(booking));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         return new Fixture(new RemoteSessionProvisioningService(repository, google, mock(NotificationService.class)), google);
     }

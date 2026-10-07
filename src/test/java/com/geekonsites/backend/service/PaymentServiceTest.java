@@ -4,6 +4,8 @@ import com.geekonsites.backend.entity.Booking;
 import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.repository.BookingRepository;
+import com.geekonsites.backend.repository.PaymentRefundRepository;
+import com.geekonsites.backend.repository.PaymentTransactionRepository;
 import com.geekonsites.backend.repository.RefundRequestRepository;
 import com.stripe.model.checkout.Session;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +46,9 @@ class PaymentServiceTest {
     private UkEarlyServiceConsentService ukEarlyServiceConsentService;
     private RefundRequestRepository refundRequestRepository;
     private NotificationService notificationService;
+    private PaymentTransactionRepository paymentTransactions;
+    private PaymentRefundRepository paymentRefunds;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     private PaymentService service;
 
     @BeforeEach
@@ -54,9 +59,17 @@ class PaymentServiceTest {
         ukEarlyServiceConsentService = mock(UkEarlyServiceConsentService.class);
         refundRequestRepository = mock(RefundRequestRepository.class);
         notificationService = mock(NotificationService.class);
+        paymentTransactions = mock(PaymentTransactionRepository.class);
+        paymentRefunds = mock(PaymentRefundRepository.class);
         service = new PaymentService(bookings, invoiceService, remoteSessionProvisioningService,
-                ukEarlyServiceConsentService, refundRequestRepository, notificationService);
+                ukEarlyServiceConsentService, refundRequestRepository, notificationService,
+                paymentTransactions, paymentRefunds, new BookingStateMachine(),
+                new PaymentTransactionStateMachine(), new PaymentRefundStateMachine(),
+                request -> { throw new UnsupportedOperationException("Checkout gateway not used in this unit test"); },
+                eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(org.springframework.transaction.PlatformTransactionManager.class));
         when(bookings.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookings.findByIdForUpdate(anyLong())).thenAnswer(inv -> bookings.findById(inv.getArgument(0)));
         // finalizePaidBooking looks the booking back up (or, once fully PAID,
         // routes through remoteSessionProvisioningService) rather than
         // returning the saved instance directly - mirror that with the same
@@ -140,7 +153,12 @@ class PaymentServiceTest {
         assertEquals("PAID", result.getPaymentStatus());
         assertEquals(BookingStatus.PAYMENT_COMPLETED, result.getBookingStatus());
         assertEquals(150.0, result.getPaidAmount());
-        verify(remoteSessionProvisioningService).provisionAfterPayment(2L);
+        // PHASE 4: remote provisioning is dispatched after commit via an event.
+        org.mockito.ArgumentCaptor<Object> events = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(events.capture());
+        org.junit.jupiter.api.Assertions.assertTrue(events.getAllValues().stream().anyMatch(event ->
+                event instanceof RemoteSessionProvisionRequestedEvent requested
+                        && requested.bookingId().equals(2L)));
     }
 
     @Test

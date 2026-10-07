@@ -5,7 +5,6 @@ import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
 import com.stripe.model.checkout.Session;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -13,26 +12,30 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * PHASE 0 — newly discovered payment-path defect (not in the updated audit).
+ * PHASE 1 — payment finalization side effects (audit H6-adjacent / Phase 0 discovery).
  *
- * <p>{@code PaymentService.finalizePaidBooking} routes every PAID booking through
- * {@code RemoteSessionProvisioningService.provisionAfterPayment}, which throws
- * "Remote session provisioning is available only for remote bookings" for an on-site
- * booking. The REMAINING payment of an on-site booking therefore marks the booking
- * PAID and then throws (Stripe webhooks would retry and keep failing). This test uses
- * the REAL collaborators (no mocks), which is why the existing mocked
- * {@code PaymentServiceTest} did not catch it.
- *
- * <p>Required future contract: settling an on-site booking must not attempt remote
- * provisioning. Tagged {@code expected-failure} — to be fixed in Phase 1.
+ * <p>Remote-session provisioning must run only for REMOTE bookings. Settling an
+ * on-site booking must never fail because remote provisioning is unsupported, while
+ * remote bookings must still attempt provisioning (so the integration is not disabled).
  */
 class OnsiteRemainingPaymentRegressionTest extends Phase0IntegrationTestSupport {
 
     @Autowired PaymentService paymentService;
 
-    @Tag("expected-failure")
+    private Session session(String id, long amountTotal, String currency, Long bookingId, String paymentType) {
+        Session session = new Session();
+        session.setId(id);
+        session.setPaymentStatus("paid");
+        session.setAmountTotal(amountTotal);
+        session.setCurrency(currency);
+        session.setMetadata(Map.of("bookingId", String.valueOf(bookingId), "paymentType", paymentType));
+        return session;
+    }
+
     @Test
     void settlingAnOnsiteBookingMustNotAttemptRemoteProvisioning() {
         Booking booking = saveBooking(999L, ServiceMode.ONSITE, "BALANCE_PENDING",
@@ -43,18 +46,31 @@ class OnsiteRemainingPaymentRegressionTest extends Phase0IntegrationTestSupport 
         booking.setPaidAmount(30.0);
         Booking saved = bookings.save(booking);
 
-        Session session = new Session();
-        session.setId("sess_onsite_remaining");
-        session.setPaymentStatus("paid");
-        session.setAmountTotal(7000L);
-        session.setCurrency("usd");
-        session.setMetadata(Map.of(
-                "bookingId", String.valueOf(saved.getId()),
-                "paymentType", "REMAINING"));
-
-        assertDoesNotThrow(() -> paymentService.applyCompletedCheckoutSession(session, null),
+        assertDoesNotThrow(() -> paymentService.applyCompletedCheckoutSession(
+                        session("sess_onsite_remaining", 7000L, "usd", saved.getId(), "REMAINING"), null),
                 "an on-site remaining payment must settle without remote-session provisioning");
 
-        assertEquals("PAID", bookings.findById(saved.getId()).orElseThrow().getPaymentStatus());
+        Booking reloaded = bookings.findById(saved.getId()).orElseThrow();
+        assertEquals("PAID", reloaded.getPaymentStatus());
+        assertEquals(null, reloaded.getRemoteSessionStatus(),
+                "on-site settlement must not touch remote-session state");
+    }
+
+    @Test
+    void remoteFullPaymentStillAttemptsRemoteProvisioning() {
+        Booking booking = saveBooking(999L, ServiceMode.REMOTE, "PENDING", BookingStatus.PENDING);
+        booking.setTotalAmount(100.0);
+        booking.setPaidAmount(0.0);
+        Booking saved = bookings.save(booking);
+
+        assertDoesNotThrow(() -> paymentService.applyCompletedCheckoutSession(
+                        session("sess_remote_full", 10000L, "usd", saved.getId(), "FULL"), null),
+                "a remote booking must still attempt remote-session provisioning");
+
+        Booking reloaded = bookings.findById(saved.getId()).orElseThrow();
+        assertEquals("PAID", reloaded.getPaymentStatus());
+        assertNotNull(reloaded.getRemoteSessionStatus(),
+                "remote provisioning must have been attempted for a remote booking");
+        assertNotEquals("PAYMENT_PENDING", reloaded.getRemoteSessionStatus());
     }
 }

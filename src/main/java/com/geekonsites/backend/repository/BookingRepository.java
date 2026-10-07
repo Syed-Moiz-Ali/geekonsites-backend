@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
@@ -22,6 +23,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByIdForUpdate(@Param("id") Long id);
 
     List<Booking> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
+
+    // PHASE 9 — one batched query for a page of CRM customers (no N+1).
+    List<Booking> findByCustomerIdInOrderByCreatedAtDesc(Collection<Long> customerIds);
+
+    // PHASE 9 — paginated booking lists (DB-side filtering/sorting).
+    Page<Booking> findByCustomerId(Long customerId, Pageable pageable);
+    Page<Booking> findByTechnicianId(Long technicianId, Pageable pageable);
+    Page<Booking> findByAgentId(Long agentId, Pageable pageable);
+    Page<Booking> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    long countByBookingStatusNotIn(Collection<BookingStatus> statuses);
 
     List<Booking> findByTechnicianIdOrderByCreatedAtDesc(Long technicianId);
 
@@ -89,4 +101,25 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     long countActiveAssignedToAgent(@Param("agentId") Long agentId, @Param("closed") List<BookingStatus> closed);
 
     long countByAgentIdAndBookingStatusIn(Long agentId, List<BookingStatus> statuses);
+
+    // PHASE 9 — bounded, row-locked recovery scan for failed/stuck remote provisioning.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select b from Booking b
+        where b.remoteSessionRequired = true
+          and b.paymentStatus = 'PAID'
+          and b.remoteSessionStatus in :statuses
+          and b.remoteProvisioningAttempts < :maxAttempts
+          and (b.remoteProvisioningNextAttemptAt is null or b.remoteProvisioningNextAttemptAt <= :now)
+        order by b.id asc
+        """)
+    List<Booking> findRemoteProvisioningRecoveryCandidates(
+            @Param("statuses") Collection<String> statuses,
+            @Param("maxAttempts") int maxAttempts,
+            @Param("now") LocalDateTime now,
+            Pageable pageable);
+
+    long countByRemoteSessionStatus(String remoteSessionStatus);
+
+    List<Booking> findByRemoteSessionStatusOrderByIdAsc(String remoteSessionStatus, Pageable pageable);
 }

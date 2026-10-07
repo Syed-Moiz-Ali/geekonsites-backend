@@ -70,4 +70,6 @@ public class RemoteSessionController {
                 .orElseThrow(() -> new RuntimeException("Technician profile not found"))
                 .getId();
     }
+
+    // PHASE 7: lifecycle/validation failures are rendered by the central GlobalExceptionHandler.
 }

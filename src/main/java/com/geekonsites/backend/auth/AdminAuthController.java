@@ -25,7 +25,7 @@ public class AdminAuthController {
     private final JwtService jwtService;
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request) {
+    public LoginResponse login(@jakarta.validation.Valid @RequestBody LoginRequest request) {
         String email = request.getEmail() == null ? "" : request.getEmail().trim();
         String password = request.getPassword() == null ? "" : request.getPassword();
 

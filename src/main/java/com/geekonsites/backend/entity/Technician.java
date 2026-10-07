@@ -52,12 +52,12 @@ public class Technician {
     private String identityDocumentType;
     private String identityDocumentName;
 
-    @Lob
+    // PHASE 9 E2E fix: PostgreSQL TEXT columns are mapped as plain String, not @Lob,
+    // so reads do not fail with "Unable to access lob stream" (e.g. GET /api/technicians/pending).
     @JsonIgnore
     @Column(columnDefinition = "TEXT")
     private String identityDocumentData;
 
-    @Lob
     @JsonIgnore
     @Column(columnDefinition = "TEXT")
     private String livePhotoData;
@@ -73,14 +73,14 @@ public class Technician {
     private String vehicleInsuranceName;
     private String publicLiabilityName;
 
-    @Lob @JsonIgnore @Column(columnDefinition = "TEXT")
+    @JsonIgnore @Column(columnDefinition = "TEXT")
     private String workAuthorizationDocumentData;
-    @Lob @JsonIgnore @Column(columnDefinition = "TEXT")
+    @JsonIgnore @Column(columnDefinition = "TEXT")
     private String addressProofData;
-    @Lob @JsonIgnore @Column(columnDefinition = "TEXT")
+    @JsonIgnore @Column(columnDefinition = "TEXT")
     private String drivingLicenseData;
-    @Lob @JsonIgnore @Column(columnDefinition = "TEXT")
+    @JsonIgnore @Column(columnDefinition = "TEXT")
     private String vehicleInsuranceData;
-    @Lob @JsonIgnore @Column(columnDefinition = "TEXT")
+    @JsonIgnore @Column(columnDefinition = "TEXT")
     private String publicLiabilityData;
 }

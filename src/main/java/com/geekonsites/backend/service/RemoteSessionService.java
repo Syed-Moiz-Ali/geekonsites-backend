@@ -1,21 +1,32 @@
 package com.geekonsites.backend.service;
 
 import com.geekonsites.backend.entity.Booking;
-import com.geekonsites.backend.enums.BookingStatus;
+import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.repository.BookingRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-
+/**
+ * PHASE 2 — remote-session operations.
+ *
+ * <p>This service keeps only remote-session-specific responsibilities (creating/reading
+ * the session marker, validating the meeting link). It no longer implements its own
+ * booking-state rules: starting and ending a remote session delegate to
+ * {@link BookingService}, which routes lifecycle transitions through
+ * {@link BookingStateMachine}. This removes the weaker parallel remote lifecycle path.
+ */
 @Service
 public class RemoteSessionService {
 
     private final BookingRepository bookingRepository;
+    private final BookingService bookingService;
 
     public RemoteSessionService(
-            BookingRepository bookingRepository
+            BookingRepository bookingRepository,
+            BookingService bookingService
     ) {
         this.bookingRepository = bookingRepository;
+        this.bookingService = bookingService;
     }
 
     public Booking createRemoteSession(Long bookingId, Long technicianId) {
@@ -41,46 +52,49 @@ public class RemoteSessionService {
 
         requirePaidRemoteBooking(booking);
 
-        booking.setBookingStatus(BookingStatus.REMOTE_SESSION_STARTED);
-        booking.setRemoteSessionStartedAt(LocalDateTime.now());
-
         if (!isValidGoogleMeetLink(booking.getRemoteSessionLink())) {
-            throw new RuntimeException("A valid Google Meet link must be saved before starting a remote session");
+            throw new InvalidBookingTransitionException(HttpStatus.BAD_REQUEST,
+                    "A valid Google Meet link must be saved before starting a remote session");
         }
 
-        return bookingRepository.save(booking);
+        return bookingService.startRemoteSession(bookingId, technicianId, booking.getRemoteSessionLink());
     }
 
     public Booking endRemoteSession(Long bookingId, Long technicianId) {
 
         Booking booking = getTechnicianBooking(bookingId, technicianId);
 
-        booking.setRemoteSessionEndedAt(LocalDateTime.now());
-        booking.setBookingStatus(BookingStatus.SERVICE_COMPLETED);
+        if (booking.getServiceMode() != ServiceMode.REMOTE) {
+            throw new InvalidBookingTransitionException(HttpStatus.BAD_REQUEST,
+                    "This booking is not a remote service");
+        }
 
-        return bookingRepository.save(booking);
+        return bookingService.completeService(bookingId, technicianId);
     }
 
     private Booking getBooking(Long bookingId) {
         return bookingRepository.findById(bookingId)
                 .orElseThrow(() ->
-                        new RuntimeException("Booking not found"));
+                        new InvalidBookingTransitionException(HttpStatus.NOT_FOUND, "Booking not found"));
     }
 
     private Booking getTechnicianBooking(Long bookingId, Long technicianId) {
         Booking booking = getBooking(bookingId);
         if (booking.getTechnicianId() == null || !booking.getTechnicianId().equals(technicianId)) {
-            throw new RuntimeException("You are not assigned to this remote session");
+            throw new InvalidBookingTransitionException(HttpStatus.FORBIDDEN,
+                    "You are not assigned to this remote session");
         }
         return booking;
     }
 
     private void requirePaidRemoteBooking(Booking booking) {
-        if (booking.getServiceMode() == null || !"REMOTE".equals(booking.getServiceMode().name())) {
-            throw new RuntimeException("This booking is not a remote service");
+        if (booking.getServiceMode() != ServiceMode.REMOTE) {
+            throw new InvalidBookingTransitionException(HttpStatus.BAD_REQUEST,
+                    "This booking is not a remote service");
         }
         if (!"PAID".equalsIgnoreCase(booking.getPaymentStatus())) {
-            throw new RuntimeException("Full payment is required before remote session access");
+            throw new InvalidBookingTransitionException(HttpStatus.CONFLICT,
+                    "Full payment is required before remote session access");
         }
     }
 

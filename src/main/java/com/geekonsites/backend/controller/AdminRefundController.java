@@ -19,7 +19,14 @@ public class AdminRefundController {
     public AdminRefundController(RefundService refundService) { this.refundService = refundService; }
 
     @GetMapping
-    public ResponseEntity<List<RefundRequest>> all() { return ResponseEntity.ok(refundService.getAll()); }
+    public ResponseEntity<com.geekonsites.backend.dto.PageResponse<com.geekonsites.backend.dto.RefundResponse>> all(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        org.springframework.data.domain.Pageable pageable = com.geekonsites.backend.dto.PageRequestParams.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "requestedAt"));
+        return ResponseEntity.ok(com.geekonsites.backend.dto.PageResponse.of(
+                refundService.getAll(pageable), com.geekonsites.backend.dto.RefundResponse::from));
+    }
 
     @PutMapping("/{id}/review")
     public ResponseEntity<RefundRequest> review(@PathVariable Long id, Authentication auth) {

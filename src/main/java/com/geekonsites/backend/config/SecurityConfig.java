@@ -27,6 +27,8 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
@@ -60,20 +62,26 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/contact/**").hasAnyAuthority("ROLE_AGENT", "ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health", "/api/ratings/technician/*").permitAll()
+                        // PHASE 6: public service discovery (public marketplace); admin management is ADMIN-only.
+                        .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/ratings").hasRole("CUSTOMER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/refunds/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/remote-session-chat/**").authenticated()
                         .requestMatchers("/api/remote-sessions/**").hasRole("TECHNICIAN")
+                        // PHASE 5: normal customer booking creation is CUSTOMER-only.
+                        .requestMatchers(HttpMethod.POST, "/api/bookings").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/bookings").hasAnyRole("AGENT", "ADMIN")
-                        .requestMatchers("/api/bookings/*/payment-success/*").hasRole("ADMIN")
-                        .requestMatchers("/api/bookings/*/remaining-payment-success/*").hasRole("ADMIN")
-                        .requestMatchers("/api/bookings/*/status/*").hasAnyRole("AGENT", "ADMIN")
+                        // PHASE 9: paginated operational booking list (AGENT/ADMIN).
+                        .requestMatchers(HttpMethod.GET, "/api/bookings/page").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers("/api/bookings/*/close").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers("/api/bookings/customer/*").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers("/api/bookings/agent/*").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers("/api/bookings/*/assign-technician/*").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers("/api/bookings/*/technician/**").hasRole("TECHNICIAN")
+                        // PHASE 9 E2E fix: meeting-link is a technician action; without this it fell
+                        // through to authenticated() and a non-technician got a 500.
+                        .requestMatchers("/api/bookings/*/meeting-link").hasRole("TECHNICIAN")
                         .requestMatchers("/api/bookings/**").authenticated()
                         .requestMatchers("/api/payments/**").authenticated()
                         .requestMatchers("/api/invoices/**").authenticated()
@@ -98,6 +106,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
+                // PHASE 7: 401/403 also use the standard ApiErrorResponse contract.
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

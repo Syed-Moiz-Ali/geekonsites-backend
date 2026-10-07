@@ -5,6 +5,8 @@ import com.geekonsites.backend.entity.Notification;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.repository.BookingRepository;
 import com.geekonsites.backend.repository.NotificationRepository;
+import com.geekonsites.backend.repository.PaymentRefundRepository;
+import com.geekonsites.backend.repository.PaymentTransactionRepository;
 import com.geekonsites.backend.repository.RefundRequestRepository;
 import com.stripe.model.checkout.Session;
 import org.junit.jupiter.api.Test;
@@ -99,10 +101,16 @@ class PaymentNotificationTest {
         InvoiceService invoices = mock(InvoiceService.class);
         RemoteSessionProvisioningService remote = mock(RemoteSessionProvisioningService.class);
         when(bookings.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookings.findByIdForUpdate(1L)).thenReturn(Optional.of(booking));
         when(bookings.save(any(Booking.class))).thenAnswer(call -> call.getArgument(0));
         when(remote.provisionAfterPayment(1L)).thenReturn(booking);
         PaymentService service = new PaymentService(bookings, invoices, remote,
-                mock(UkEarlyServiceConsentService.class), mock(RefundRequestRepository.class), notifications);
+                mock(UkEarlyServiceConsentService.class), mock(RefundRequestRepository.class), notifications,
+                mock(PaymentTransactionRepository.class), mock(PaymentRefundRepository.class),
+                new BookingStateMachine(), new PaymentTransactionStateMachine(), new PaymentRefundStateMachine(),
+                request -> { throw new UnsupportedOperationException("Checkout gateway not used in this unit test"); },
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(org.springframework.transaction.PlatformTransactionManager.class));
         return new Fixture(service, bookings, notifications);
     }
 

@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -125,7 +126,7 @@ class TechnicianPersonalEmailLoginIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody(OLD_COMPANY_EMAIL, PASSWORD)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(status().reason("Invalid email or password."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid email or password."));
     }
 
     @Test
@@ -136,7 +137,7 @@ class TechnicianPersonalEmailLoginIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody(PERSONAL_EMAIL, "WrongPassword1!")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(status().reason("Invalid email or password."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid email or password."));
     }
 
     @Test
@@ -145,7 +146,7 @@ class TechnicianPersonalEmailLoginIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("nobody@example.com", PASSWORD)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(status().reason("Invalid email or password."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid email or password."));
     }
 
     @Test
@@ -181,7 +182,8 @@ class TechnicianPersonalEmailLoginIntegrationTest {
         // Confirms delivery was actually attempted (previously this silently
         // no-op'd because the old company_email-first lookup found no
         // technician access record for the personal email).
-        verify(resendEmailClient).send(
+        // Password-reset delivery is @Async; await the interaction (bounded) rather than racing it.
+        verify(resendEmailClient, timeout(5000)).send(
                 org.mockito.ArgumentMatchers.eq("GeekOnSites Support <support@geekonsites.com>"),
                 org.mockito.ArgumentMatchers.eq(PERSONAL_EMAIL),
                 anyString(), anyString());

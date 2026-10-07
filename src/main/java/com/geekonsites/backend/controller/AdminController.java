@@ -44,10 +44,13 @@ public class AdminController {
     }
 
     @GetMapping("/customers")
-    public ResponseEntity<List<User>> getCustomers() {
-        return ResponseEntity.ok(userRepository.findAll().stream()
-                .filter(user -> user.getRole() == Role.CUSTOMER)
-                .toList());
+    public ResponseEntity<com.geekonsites.backend.dto.PageResponse<com.geekonsites.backend.dto.AdminCustomerResponse>> getCustomers(
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(adminService.getCustomers(search,
+                com.geekonsites.backend.dto.PageRequestParams.of(page, size,
+                        org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"))));
     }
 
     @GetMapping("/remote-sessions")

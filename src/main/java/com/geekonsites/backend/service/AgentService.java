@@ -138,8 +138,10 @@ public Booking assignBookingToAgent(
     Booking saved = bookingRepository.save(booking);
     notificationService.createAgentNotification(
             agent.getId(),
+            com.geekonsites.backend.enums.NotificationType.TECHNICIAN_ASSIGNED,
             "Booking assigned",
-            "Booking GOS-" + saved.getId() + " is now assigned to you. Open the agent dashboard to review and coordinate it."
+            "Booking GOS-" + saved.getId() + " is now assigned to you. Open the agent dashboard to review and coordinate it.",
+            "AGENT_BOOKING_ASSIGNED:" + saved.getId() + ":" + agent.getId()
     );
     return saved;
 }

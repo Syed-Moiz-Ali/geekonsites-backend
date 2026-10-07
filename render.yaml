@@ -49,7 +49,7 @@ services:
       - key: MAIL_FROM_NAME
         value: GeekOnSites Support
       - key: SUPPORT_EMAIL
-        value: support@gos.com
+        value: support@geekonsites.com
       - key: RESEND_API_KEY
         sync: false
       - key: PASSWORD_RESET_ALLOWED_ORIGINS

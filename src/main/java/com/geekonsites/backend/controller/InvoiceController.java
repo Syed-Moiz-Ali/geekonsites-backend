@@ -32,9 +32,10 @@ public class InvoiceController {
             Authentication authentication
     ) {
         User user = authenticatedUser(authentication);
-        bookingService.getBookingForCurrentUser(bookingId, user);
+        // PHASE 5: authorize the action BEFORE any invoice mutation happens, so a
+        // forbidden caller can never cause a database change. Technicians are rejected.
+        bookingService.authorizeInvoiceAction(bookingId, user);
         Invoice invoice = invoiceService.generateInvoiceFromBooking(bookingId);
-        verifyAccess(invoice, user);
         return ResponseEntity.ok(invoice);
     }
 

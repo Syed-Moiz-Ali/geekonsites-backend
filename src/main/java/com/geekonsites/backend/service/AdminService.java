@@ -44,10 +44,11 @@ public class AdminService {
 
         List<Booking> bookings = bookingRepository.findAll();
 
-        double totalRevenue = bookings.stream()
-                .filter(b -> b.getPaidAmount() != null)
-                .mapToDouble(Booking::getPaidAmount)
+        // PHASE 8 — sum exact minor units (no floating-point accumulation).
+        long totalRevenueMinor = bookings.stream()
+                .mapToLong(b -> PaymentMoney.resolveMinor(b.getPaidAmountMinor(), b.getPaidAmount()))
                 .sum();
+        double totalRevenue = PaymentMoney.toMajor(totalRevenueMinor);
 
         long activeJobs = bookings.stream()
                 .filter(b ->
@@ -79,6 +80,18 @@ public class AdminService {
                 completedJobs,
                 pendingJobs
         );
+    }
+
+    /**
+     * PHASE 9 — paginated, DB-filtered admin customer list (was an unbounded findAll()).
+     */
+    public com.geekonsites.backend.dto.PageResponse<com.geekonsites.backend.dto.AdminCustomerResponse> getCustomers(
+            String search, org.springframework.data.domain.Pageable pageable) {
+        String q = search == null ? "" : search.trim().toLowerCase(java.util.Locale.ROOT);
+        org.springframework.data.domain.Page<com.geekonsites.backend.entity.User> page =
+                userRepository.searchByRole(Role.CUSTOMER, q, pageable);
+        return com.geekonsites.backend.dto.PageResponse.of(page,
+                com.geekonsites.backend.dto.AdminCustomerResponse::from);
     }
 
     public List<Booking> getRemoteSessions() {

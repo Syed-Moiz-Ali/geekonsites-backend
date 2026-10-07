@@ -2,15 +2,21 @@ package com.geekonsites.backend.repository;
 
 import com.geekonsites.backend.entity.Technician;
 import com.geekonsites.backend.repository.projection.TechnicianAccessView;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface TechnicianRepository extends JpaRepository<Technician, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from Technician t where t.id = :id")
+    Optional<Technician> findByIdForUpdate(@Param("id") Long id);
 
     List<Technician> findByVerificationStatus(String verificationStatus);
 

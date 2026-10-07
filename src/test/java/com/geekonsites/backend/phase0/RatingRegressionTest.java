@@ -7,7 +7,6 @@ import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -26,7 +25,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class RatingRegressionTest extends Phase0IntegrationTestSupport {
 
-    @Tag("expected-failure")
     @Test
     void secondRatingForTheSameBookingMustBeRejected() throws Exception {
         User customer = saveUser(Role.CUSTOMER, "rating-customer-" + System.nanoTime() + "@example.com", "US");

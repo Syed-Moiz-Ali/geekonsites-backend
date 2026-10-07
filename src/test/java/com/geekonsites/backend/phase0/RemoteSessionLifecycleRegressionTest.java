@@ -6,7 +6,6 @@ import com.geekonsites.backend.entity.User;
 import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -36,7 +35,6 @@ class RemoteSessionLifecycleRegressionTest extends Phase0IntegrationTestSupport 
         return new Actor(technician, bearer(user));
     }
 
-    @Tag("expected-failure")
     @Test
     void remoteSessionEndMustNotCompleteAnOnsiteBooking() throws Exception {
         Actor actor = assignedTechnician();
@@ -48,7 +46,6 @@ class RemoteSessionLifecycleRegressionTest extends Phase0IntegrationTestSupport 
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void remoteSessionEndMustNotCompleteAPaidButNotAcceptedBooking() throws Exception {
         Actor actor = assignedTechnician();
@@ -62,7 +59,6 @@ class RemoteSessionLifecycleRegressionTest extends Phase0IntegrationTestSupport 
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void remoteSessionEndMustNotCompleteAnUnpaidBooking() throws Exception {
         Actor actor = assignedTechnician();
@@ -76,7 +72,6 @@ class RemoteSessionLifecycleRegressionTest extends Phase0IntegrationTestSupport 
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void remoteSessionStartMustRequireTechnicianAcceptance() throws Exception {
         Actor actor = assignedTechnician();

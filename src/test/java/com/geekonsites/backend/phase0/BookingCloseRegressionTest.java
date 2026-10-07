@@ -6,7 +6,6 @@ import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -35,7 +34,6 @@ class BookingCloseRegressionTest extends Phase0IntegrationTestSupport {
         return bookings.save(booking);
     }
 
-    @Tag("expected-failure")
     @Test
     void paidInvoiceButUnassignedBookingMustNotClose() throws Exception {
         User agent = agent();
@@ -46,7 +44,6 @@ class BookingCloseRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void paidInvoiceButOnlyAssignedBookingMustNotClose() throws Exception {
         User agent = agent();
@@ -57,7 +54,6 @@ class BookingCloseRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void paidInvoiceButOnlyAcceptedBookingMustNotClose() throws Exception {
         User agent = agent();
@@ -68,7 +64,6 @@ class BookingCloseRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void paidInvoiceButServiceStartedBookingMustNotClose() throws Exception {
         User agent = agent();

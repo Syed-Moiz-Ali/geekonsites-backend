@@ -1,6 +1,8 @@
 package com.geekonsites.backend.dto;
 
 import com.geekonsites.backend.enums.ServiceMode;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -13,6 +15,9 @@ public class BookingRequest {
     private String customerPhone;
 
     // Service Details
+    // PHASE 6: serviceCode is the authoritative identifier (stable catalog code). serviceType
+    // is retained only as a legacy compatibility alias resolved to a catalog code/name.
+    private String serviceCode;
     private String serviceType;
     private ServiceMode serviceMode;
     private String issueDescription;
@@ -25,7 +30,11 @@ public class BookingRequest {
     private String postalCode;
 
     // Schedule
+    // PHASE 7: format validated declaratively; the actual calendar date is parsed safely
+    // in the service (a format-valid but impossible date still yields 400, never 500).
+    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "bookingDate must be a valid date in YYYY-MM-DD format")
     private String bookingDate;
+    @Size(max = 40, message = "timeSlot must be 40 characters or fewer")
     private String timeSlot;
 
     // Currency

@@ -1,6 +1,9 @@
 package com.geekonsites.backend.dto;
 
+import jakarta.validation.constraints.NotNull;
+
 public class StripeCheckoutRequest {
+    @NotNull(message = "bookingId is required")
     private Long bookingId;
     private String paymentType;
     private Boolean ukEarlyServiceConsent;

@@ -4,7 +4,6 @@ import com.geekonsites.backend.entity.Technician;
 import com.geekonsites.backend.entity.User;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -53,7 +52,6 @@ class BookingCreationRoleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(jsonPath("$.customerId").value(customer.getId()));
     }
 
-    @Tag("expected-failure")
     @Test
     void technicianMustNotSilentlyCreateACustomerBooking() throws Exception {
         mvc.perform(post("/api/bookings")
@@ -63,7 +61,6 @@ class BookingCreationRoleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void agentMustNotSilentlyCreateACustomerBooking() throws Exception {
         mvc.perform(post("/api/bookings")
@@ -73,7 +70,6 @@ class BookingCreationRoleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void adminMustNotSilentlyCreateACustomerBooking() throws Exception {
         mvc.perform(post("/api/bookings")

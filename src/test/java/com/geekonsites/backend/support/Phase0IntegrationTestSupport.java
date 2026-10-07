@@ -11,7 +11,10 @@ import com.geekonsites.backend.jwt.JwtService;
 import com.geekonsites.backend.repository.BookingRepository;
 import com.geekonsites.backend.repository.InvoiceRepository;
 import com.geekonsites.backend.repository.NotificationRepository;
+import com.geekonsites.backend.repository.PaymentRefundRepository;
+import com.geekonsites.backend.repository.PaymentTransactionRepository;
 import com.geekonsites.backend.repository.RatingRepository;
+import com.geekonsites.backend.repository.RefundRequestRepository;
 import com.geekonsites.backend.repository.TechnicianRepository;
 import com.geekonsites.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +62,9 @@ public abstract class Phase0IntegrationTestSupport {
     @Autowired protected InvoiceRepository invoices;
     @Autowired protected RatingRepository ratings;
     @Autowired protected NotificationRepository notifications;
+    @Autowired protected PaymentTransactionRepository paymentTransactions;
+    @Autowired protected PaymentRefundRepository paymentRefunds;
+    @Autowired protected RefundRequestRepository refundRequests;
     @Autowired protected JwtService jwt;
     @Autowired protected PasswordEncoder passwordEncoder;
 
@@ -70,6 +76,9 @@ public abstract class Phase0IntegrationTestSupport {
         notifications.deleteAll();
         ratings.deleteAll();
         invoices.deleteAll();
+        paymentRefunds.deleteAll();
+        paymentTransactions.deleteAll();
+        refundRequests.deleteAll();
         bookings.deleteAll();
         technicians.deleteAll();
         users.deleteAll();
@@ -143,6 +152,15 @@ public abstract class Phase0IntegrationTestSupport {
         booking.setAdvanceAmount(0.0);
         booking.setRemainingAmount(0.0);
         booking.setPaidAmount("PAID".equalsIgnoreCase(paymentStatus) ? 41.0 : 0.0);
+        // PHASE 8 — exact minor-unit authority for the seeded booking.
+        booking.setBaseAmountMinor(2900L);
+        booking.setAddonsAmountMinor(0L);
+        booking.setProtectionAmountMinor(0L);
+        booking.setPlatformFeeMinor(1200L);
+        booking.setTotalAmountMinor(4100L);
+        booking.setAdvanceAmountMinor(0L);
+        booking.setRemainingAmountMinor(0L);
+        booking.setPaidAmountMinor("PAID".equalsIgnoreCase(paymentStatus) ? 4100L : 0L);
         booking.setPaymentStatus(paymentStatus);
         booking.setPaymentType(ServiceMode.ONSITE == mode ? "ADVANCE_PAYMENT" : "FULL_PAYMENT");
         booking.setInvoiceGenerated(false);

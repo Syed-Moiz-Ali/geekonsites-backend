@@ -19,7 +19,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import jakarta.validation.Valid;
+import java.util.Locale;
 import java.util.Map;
+import com.geekonsites.backend.service.CountrySupport;
 import com.geekonsites.backend.service.PasswordResetService;
 import com.geekonsites.backend.enums.Role;
 
@@ -77,15 +79,19 @@ public class AuthController {
     @PostMapping("/register")
     public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already registered");
+        // Email identity is normalized (trim + lower-case) for consistent, case-insensitive
+        // uniqueness across registration and login.
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase(Locale.ROOT);
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
 
-        String country = "UK".equalsIgnoreCase(request.getCountry()) ? "UK" : "US";
+        // PHASE 5: US/UK only. Unsupported/blank/null country is rejected, never defaulted.
+        String country = CountrySupport.normalize(request.getCountry());
 
         User user = new User();
         user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
         user.setCountry(country);
@@ -106,7 +112,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request) {
+    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
 
         // Unknown email and wrong password must be indistinguishable to the
         // caller (same status, same message) so a login attempt can never be

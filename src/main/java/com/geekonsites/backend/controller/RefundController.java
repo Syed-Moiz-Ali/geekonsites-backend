@@ -26,8 +26,15 @@ public class RefundController {
     }
 
     @GetMapping("/my-refunds")
-    public ResponseEntity<List<RefundRequest>> mine(Authentication authentication) {
-        return ResponseEntity.ok(refundService.getCustomerRefunds(principal(authentication)));
+    public ResponseEntity<com.geekonsites.backend.dto.PageResponse<com.geekonsites.backend.dto.RefundResponse>> mine(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        org.springframework.data.domain.Pageable pageable = com.geekonsites.backend.dto.PageRequestParams.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "requestedAt"));
+        return ResponseEntity.ok(com.geekonsites.backend.dto.PageResponse.of(
+                refundService.getCustomerRefunds(principal(authentication), pageable),
+                com.geekonsites.backend.dto.RefundResponse::from));
     }
 
     @GetMapping("/{id}")

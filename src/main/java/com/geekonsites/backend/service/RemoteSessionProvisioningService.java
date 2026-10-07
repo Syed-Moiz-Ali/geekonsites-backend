@@ -4,36 +4,43 @@ import com.geekonsites.backend.entity.Booking;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.repository.BookingRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RemoteSessionProvisioningService {
     private final BookingRepository bookingRepository;
-    private final GoogleCalendarService googleCalendarService;
+    private final RemoteMeetingProvider remoteMeetingProvider;
     private final NotificationService notificationService;
 
     public RemoteSessionProvisioningService(
             BookingRepository bookingRepository,
-            GoogleCalendarService googleCalendarService,
+            RemoteMeetingProvider remoteMeetingProvider,
             NotificationService notificationService
     ) {
         this.bookingRepository = bookingRepository;
-        this.googleCalendarService = googleCalendarService;
+        this.remoteMeetingProvider = remoteMeetingProvider;
         this.notificationService = notificationService;
     }
 
-    @Transactional
+    // PHASE 4: intentionally NOT @Transactional and NOT lock-based. This runs after the
+    // payment transaction commits, and each state save is a short independent write, so
+    // no DB lock is held during the Google Calendar network call.
     public Booking provisionAfterPayment(Long bookingId) {
-        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+        Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-        if (!isRemote(booking)) throw new RuntimeException("Remote session provisioning is available only for remote bookings");
+        if (!isRemote(booking)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Remote session provisioning is available only for remote bookings");
+        }
         if (!"PAID".equalsIgnoreCase(booking.getPaymentStatus())) {
             booking.setRemoteSessionStatus("PAYMENT_PENDING");
             booking.setRemoteSessionLink(null);
             booking.setGoogleCalendarEventId(null);
             bookingRepository.save(booking);
-            throw new RuntimeException("Full payment is required before remote session provisioning");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Full payment is required before remote session provisioning");
         }
         if (hasText(booking.getRemoteSessionLink()) && hasText(booking.getGoogleCalendarEventId())) {
             return syncExistingEventAttendees(booking);
@@ -44,14 +51,14 @@ public class RemoteSessionProvisioningService {
         booking.setRemoteSessionProvisioningError(null);
         bookingRepository.save(booking);
 
-        if (!googleCalendarService.isConfigured()) {
+        if (!remoteMeetingProvider.isConfigured()) {
             booking.setRemoteSessionStatus("FAILED");
-            booking.setRemoteSessionProvisioningError(googleCalendarService.configurationIssue());
+            booking.setRemoteSessionProvisioningError(remoteMeetingProvider.configurationIssue());
             return bookingRepository.save(booking);
         }
 
         try {
-            GoogleCalendarService.MeetingDetails meeting = googleCalendarService.createGoogleMeetLink(booking);
+            RemoteMeetingProvider.MeetingDetails meeting = remoteMeetingProvider.createGoogleMeetLink(booking);
             booking.setGoogleCalendarEventId(meeting.eventId());
             booking.setRemoteSessionLink(meeting.meetingLink());
             booking.setRemoteSessionScheduledStart(meeting.scheduledStart());
@@ -61,8 +68,10 @@ public class RemoteSessionProvisioningService {
             Booking saved = bookingRepository.save(booking);
             notificationService.createNotification(
                     saved.getCustomerId(),
+                    com.geekonsites.backend.enums.NotificationType.REMOTE_SESSION_READY,
                     "Remote Session Ready",
-                    "Your secure Google Meet session for booking GOS-" + saved.getId() + " is ready."
+                    "Your secure Google Meet session for booking GOS-" + saved.getId() + " is ready.",
+                    "REMOTE_SESSION_READY:" + saved.getId()
             );
             return saved;
         } catch (RuntimeException error) {
@@ -79,9 +88,9 @@ public class RemoteSessionProvisioningService {
     }
 
     private Booking syncExistingEventAttendees(Booking booking) {
-        if (!googleCalendarService.isConfigured()) return booking;
+        if (!remoteMeetingProvider.isConfigured()) return booking;
         try {
-            googleCalendarService.syncExistingEventAttendees(booking);
+            remoteMeetingProvider.syncExistingEventAttendees(booking);
             booking.setRemoteSessionProvisioningError(null);
         } catch (RuntimeException error) {
             booking.setRemoteSessionProvisioningError("Calendar attendee update failed");

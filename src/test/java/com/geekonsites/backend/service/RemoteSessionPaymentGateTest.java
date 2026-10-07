@@ -18,7 +18,7 @@ class RemoteSessionPaymentGateTest {
     @Test
     void unpaidAndFailedRemoteBookingsCannotCreateOrAccessSession() {
         BookingRepository repository = mock(BookingRepository.class);
-        RemoteSessionService service = new RemoteSessionService(repository);
+        RemoteSessionService service = new RemoteSessionService(repository, mock(BookingService.class));
         Booking booking = remote("PENDING", 5L);
         when(repository.findById(1L)).thenReturn(Optional.of(booking));
 
@@ -31,7 +31,7 @@ class RemoteSessionPaymentGateTest {
     @Test
     void paidRemoteBookingCanProgress() {
         BookingRepository repository = mock(BookingRepository.class);
-        RemoteSessionService service = new RemoteSessionService(repository);
+        RemoteSessionService service = new RemoteSessionService(repository, mock(BookingService.class));
         Booking booking = remote("PAID", 5L);
         when(repository.findById(1L)).thenReturn(Optional.of(booking));
         when(repository.save(booking)).thenReturn(booking);
@@ -43,7 +43,7 @@ class RemoteSessionPaymentGateTest {
     @Test
     void anotherTechnicianCannotAccessRemoteBooking() {
         BookingRepository repository = mock(BookingRepository.class);
-        RemoteSessionService service = new RemoteSessionService(repository);
+        RemoteSessionService service = new RemoteSessionService(repository, mock(BookingService.class));
         when(repository.findById(1L)).thenReturn(Optional.of(remote("PAID", 5L)));
         assertThrows(RuntimeException.class, () -> service.getRemoteSession(1L, 9L));
     }
@@ -51,7 +51,7 @@ class RemoteSessionPaymentGateTest {
     @Test
     void onsiteBookingIsUnaffectedByRemoteWorkflowAndCannotBeConverted() {
         BookingRepository repository = mock(BookingRepository.class);
-        RemoteSessionService service = new RemoteSessionService(repository);
+        RemoteSessionService service = new RemoteSessionService(repository, mock(BookingService.class));
         Booking booking = remote("PARTIALLY_PAID", 5L);
         booking.setServiceMode(ServiceMode.ONSITE);
         when(repository.findById(1L)).thenReturn(Optional.of(booking));
@@ -76,7 +76,9 @@ class RemoteSessionPaymentGateTest {
         when(bookings.findById(1L)).thenReturn(Optional.of(booking));
         BookingService service = new BookingService(bookings, mock(TechnicianRepository.class),
                 mock(TrustedPricingService.class), mock(NotificationService.class),
-                mock(UkEarlyServiceConsentService.class), mock(RemoteSessionProvisioningService.class));
+                mock(UkEarlyServiceConsentService.class), mock(RemoteSessionProvisioningService.class),
+                new BookingStateMachine(), mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(InvoiceService.class));
         User otherCustomer = new User();
         otherCustomer.setId(8L);
         otherCustomer.setRole(Role.CUSTOMER);
@@ -93,3 +95,4 @@ class RemoteSessionPaymentGateTest {
         return booking;
     }
 }
+

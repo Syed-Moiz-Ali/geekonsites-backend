@@ -1,51 +1,53 @@
 package com.geekonsites.backend.service;
 
-import com.geekonsites.backend.entity.Booking;
+import com.geekonsites.backend.entity.PaymentTransaction;
 import com.stripe.Stripe;
 import com.stripe.model.Charge;
 import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
-import com.stripe.model.checkout.Session;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.RefundCreateParams;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-
+/**
+ * PHASE 1 — Stripe implementation of a per-transaction refund.
+ *
+ * <p>Every refund is executed against the exact PaymentIntent recorded on the ledger
+ * row, with the amount validated against that PaymentIntent's remaining captured
+ * amount. Idempotency keys are supplied by the caller and persisted with the
+ * {@code PaymentRefund} row.
+ */
 @Service
 public class StripeRefundGatewayImpl implements StripeRefundGateway {
     @Value("${stripe.secret.key}")
     private String stripeSecretKey;
 
     @Override
-    public StripeRefundResult refund(Booking booking, BigDecimal amount, String idempotencyKey) {
+    public StripeRefundResult refundPaymentTransaction(PaymentTransaction transaction, long amountMinor, String idempotencyKey) {
         try {
             Stripe.apiKey = stripeSecretKey;
-            String sessionId = booking.getPaymentTransactionId();
-            if (sessionId == null || sessionId.isBlank()) throw new RuntimeException("Booking has no Stripe payment reference");
+            String paymentIntentId = transaction.getPaymentIntentId();
+            if (paymentIntentId == null || paymentIntentId.isBlank()) {
+                throw new RuntimeException("Payment transaction has no Stripe PaymentIntent");
+            }
 
-            Session session = Session.retrieve(sessionId);
-            if (!"paid".equalsIgnoreCase(session.getPaymentStatus())) throw new RuntimeException("Original Stripe payment is not successful");
-            if (!String.valueOf(booking.getId()).equals(session.getMetadata().get("bookingId"))) throw new RuntimeException("Stripe payment does not belong to this booking");
-            if (session.getCurrency() == null || !session.getCurrency().equalsIgnoreCase(booking.getCurrency())) throw new RuntimeException("Stripe payment currency does not match booking currency");
-            if (session.getPaymentIntent() == null) throw new RuntimeException("Stripe PaymentIntent is missing");
-
-            PaymentIntent paymentIntent = PaymentIntent.retrieve(session.getPaymentIntent());
-            long requested = amount.movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
+            PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentIntentId);
             long captured = paymentIntent.getAmountReceived() == null ? 0 : paymentIntent.getAmountReceived();
             long alreadyRefunded = 0;
             if (paymentIntent.getLatestCharge() != null) {
                 Charge charge = Charge.retrieve(paymentIntent.getLatestCharge());
                 alreadyRefunded = charge.getAmountRefunded() == null ? 0 : charge.getAmountRefunded();
             }
-            if (requested <= 0 || requested > captured - alreadyRefunded) throw new RuntimeException("Refund exceeds the remaining captured Stripe amount");
+            if (amountMinor <= 0 || amountMinor > captured - alreadyRefunded) {
+                throw new RuntimeException("Refund exceeds the remaining captured Stripe amount");
+            }
 
             RefundCreateParams params = RefundCreateParams.builder()
                     .setPaymentIntent(paymentIntent.getId())
-                    .setAmount(requested)
-                    .putMetadata("bookingId", String.valueOf(booking.getId()))
+                    .setAmount(amountMinor)
+                    .putMetadata("bookingId", String.valueOf(transaction.getBookingId()))
+                    .putMetadata("paymentTransactionId", String.valueOf(transaction.getId()))
                     .build();
             Refund refund = Refund.create(params, RequestOptions.builder().setIdempotencyKey(idempotencyKey).build());
             return new StripeRefundResult(paymentIntent.getId(), refund.getId(), refund.getStatus());

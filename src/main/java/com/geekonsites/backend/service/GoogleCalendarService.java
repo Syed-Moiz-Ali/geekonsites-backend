@@ -32,7 +32,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
-public class GoogleCalendarService {
+public class GoogleCalendarService implements RemoteMeetingProvider {
     private static final String APPLICATION_NAME = "GeekOnSites Remote Support";
     private static final GsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d{1,2})(?::(\\d{2}))?\\s*(AM|PM)?", Pattern.CASE_INSENSITIVE);
@@ -230,6 +230,4 @@ public class GoogleCalendarService {
     private String safe(String value) {
         return hasText(value) ? value : "Not provided";
     }
-
-    public record MeetingDetails(String eventId, String meetingLink, LocalDateTime scheduledStart, LocalDateTime scheduledEnd) {}
 }

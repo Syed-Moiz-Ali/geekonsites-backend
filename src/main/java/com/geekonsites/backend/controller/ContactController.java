@@ -29,8 +29,12 @@ public class ContactController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ContactMessage>> getAllMessages() {
-        return ResponseEntity.ok(contactService.getAllMessages());
+    public ResponseEntity<com.geekonsites.backend.dto.PageResponse<com.geekonsites.backend.dto.ContactMessageResponse>> getAllMessages(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(contactService.getAllMessages(
+                com.geekonsites.backend.dto.PageRequestParams.of(page, size,
+                        org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))));
     }
 
     @GetMapping("/{id}")

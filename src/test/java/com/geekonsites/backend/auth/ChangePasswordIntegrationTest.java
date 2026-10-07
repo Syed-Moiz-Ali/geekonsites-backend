@@ -85,10 +85,11 @@ class ChangePasswordIntegrationTest {
 
     @Test
     void unauthenticatedRequestIsRejected() throws Exception {
+        // PHASE 7: an unauthenticated request is 401 (standardized).
         mvc.perform(post("/api/auth/change-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("CurrentPass123!", "NewSecurePass456!")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

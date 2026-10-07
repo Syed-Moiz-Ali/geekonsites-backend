@@ -5,11 +5,13 @@ import com.geekonsites.backend.dto.CustomerLocationRequest;
 import com.geekonsites.backend.dto.TechnicianLocationRequest;
 import com.geekonsites.backend.entity.Booking;
 import com.geekonsites.backend.entity.User;
-import com.geekonsites.backend.enums.BookingStatus;
+import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.repository.TechnicianRepository;
 import com.geekonsites.backend.repository.UserRepository;
 import com.geekonsites.backend.service.BookingService;
+import com.geekonsites.backend.service.RatingService;
 import com.geekonsites.backend.service.RemoteSessionProvisioningService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -25,17 +27,20 @@ import java.util.Map;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final RatingService ratingService;
     private final TechnicianRepository technicianRepository;
     private final UserRepository userRepository;
     private final RemoteSessionProvisioningService remoteSessionProvisioningService;
 
     public BookingController(
             BookingService bookingService,
+            RatingService ratingService,
             TechnicianRepository technicianRepository,
             UserRepository userRepository,
             RemoteSessionProvisioningService remoteSessionProvisioningService
     ) {
         this.bookingService = bookingService;
+        this.ratingService = ratingService;
         this.technicianRepository = technicianRepository;
         this.userRepository = userRepository;
         this.remoteSessionProvisioningService = remoteSessionProvisioningService;
@@ -48,6 +53,15 @@ public class BookingController {
     ) {
         User customer = getLoggedInUser(authentication);
 
+        // PHASE 5: the normal customer booking endpoint is CUSTOMER-only. Operational
+        // accounts must never silently become a booking's customer. (Defense in depth;
+        // SecurityConfig also requires ROLE_CUSTOMER.)
+        if (customer.getRole() != Role.CUSTOMER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only a customer account can create a booking");
+        }
+
+        // Customer identity always comes from the authenticated principal.
         request.setCustomerId(customer.getId());
         request.setCustomerName(customer.getFullName());
         request.setCustomerEmail(customer.getEmail());
@@ -63,6 +77,16 @@ public class BookingController {
         return ResponseEntity.ok(
                 bookingService.getAllBookings()
         );
+    }
+
+    /** PHASE 9 — paginated operational booking list (AGENT/ADMIN). */
+    @GetMapping("/page")
+    public ResponseEntity<com.geekonsites.backend.dto.PageResponse<Booking>> getAllBookingsPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(bookingService.getAllBookings(
+                com.geekonsites.backend.dto.PageRequestParams.of(page, size,
+                        org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))));
     }
 
     @GetMapping("/{bookingId}")
@@ -97,6 +121,18 @@ public class BookingController {
         return ResponseEntity.ok(
                 bookingService.getBookingsByCustomerId(customer.getId())
         );
+    }
+
+    /** PHASE 9 — paginated customer booking history; ownership from the principal. */
+    @GetMapping("/my-bookings/page")
+    public ResponseEntity<com.geekonsites.backend.dto.PageResponse<Booking>> getMyBookingsPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        User customer = getLoggedInUser(authentication);
+        return ResponseEntity.ok(bookingService.getBookingsByCustomerId(customer.getId(),
+                com.geekonsites.backend.dto.PageRequestParams.of(page, size,
+                        org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))));
     }
 
     @GetMapping("/customer/{customerId}")
@@ -159,20 +195,11 @@ public class BookingController {
         );
     }
 
-    @PutMapping("/{bookingId}/payment-success/{transactionId}")
-    public ResponseEntity<Booking> paymentSuccess(
-            @PathVariable Long bookingId,
-            @PathVariable String transactionId,
-            @RequestParam(defaultValue = "CARD") String paymentMethod
-    ) {
-        return ResponseEntity.ok(
-                bookingService.paymentSuccess(
-                        bookingId,
-                        transactionId,
-                        paymentMethod
-                )
-        );
-    }
+    // NOTE (PHASE 1): the legacy admin-only "/payment-success/{transactionId}" endpoint
+    // was removed. It accepted a client-supplied transaction id and marked a booking
+    // paid without any Stripe verification (audit C2 / BUG-02). Payment state can now
+    // only be changed by the verified Stripe webhook or the authenticated
+    // confirm-checkout-session fallback in PaymentService.
 
     // ==========================
     // Technician Workflow APIs
@@ -244,7 +271,7 @@ public ResponseEntity<Booking> technicianArrived(
     @PutMapping("/{bookingId}/technician/location")
     public ResponseEntity<Booking> updateTechnicianLocation(
             @PathVariable Long bookingId,
-            @RequestBody TechnicianLocationRequest request,
+            @Valid @RequestBody TechnicianLocationRequest request,
             Authentication authentication
     ) {
         Long technicianId = getLoggedInTechnicianId(authentication);
@@ -328,7 +355,7 @@ public ResponseEntity<Booking> technicianArrived(
     @PutMapping("/{bookingId}/customer-location")
     public ResponseEntity<Booking> updateCustomerLocation(
             @PathVariable Long bookingId,
-            @RequestBody CustomerLocationRequest request,
+            @Valid @RequestBody CustomerLocationRequest request,
             Authentication authentication
     ) {
         User customer = getLoggedInUser(authentication);
@@ -349,26 +376,15 @@ public ResponseEntity<Booking> technicianArrived(
             @PathVariable Long bookingId,
             Authentication authentication
     ) {
-        bookingService.getBookingForCurrentUser(bookingId, getLoggedInUser(authentication));
+        // PHASE 5: authorize BEFORE any mutation. Technicians are rejected here.
+        bookingService.authorizeInvoiceAction(bookingId, getLoggedInUser(authentication));
         return ResponseEntity.ok(
                 bookingService.generateInvoice(bookingId)
         );
     }
 
-    @PutMapping("/{bookingId}/remaining-payment-success/{transactionId}")
-    public ResponseEntity<Booking> remainingPaymentSuccess(
-            @PathVariable Long bookingId,
-            @PathVariable String transactionId,
-            @RequestParam(defaultValue = "CARD") String paymentMethod
-    ) {
-        return ResponseEntity.ok(
-                bookingService.remainingPaymentSuccess(
-                        bookingId,
-                        transactionId,
-                        paymentMethod
-                )
-        );
-    }
+    // NOTE (PHASE 1): the legacy admin-only "/remaining-payment-success/{transactionId}"
+    // endpoint was removed for the same reason as "/payment-success" (audit C2 / BUG-02).
 
     @PutMapping("/{bookingId}/rating")
     public ResponseEntity<Booking> rateBooking(
@@ -378,17 +394,13 @@ public ResponseEntity<Booking> technicianArrived(
     ) {
         User customer = getLoggedInUser(authentication);
 
-        Integer rating = Integer.parseInt(request.get("rating"));
+        String ratingText = request.get("rating");
+        Integer rating = ratingText == null || ratingText.isBlank() ? null : Integer.valueOf(ratingText);
         String review = request.get("review");
 
-        return ResponseEntity.ok(
-                bookingService.rateBooking(
-                        bookingId,
-                        customer.getId(),
-                        rating,
-                        review
-                )
-        );
+        // PHASE 5: single rating authority (ownership, lifecycle, one-per-booking).
+        ratingService.submitRating(bookingId, rating, review, customer);
+        return ResponseEntity.ok(bookingService.getBookingById(bookingId));
     }
 
     @PutMapping("/{bookingId}/close")
@@ -400,18 +412,9 @@ public ResponseEntity<Booking> technicianArrived(
         );
     }
 
-    @PutMapping("/{bookingId}/status/{status}")
-    public ResponseEntity<Booking> updateStatus(
-            @PathVariable Long bookingId,
-            @PathVariable BookingStatus status
-    ) {
-        return ResponseEntity.ok(
-                bookingService.updateStatus(
-                        bookingId,
-                        status
-                )
-        );
-    }
+    // NOTE (PHASE 2): the arbitrary "PUT /{bookingId}/status/{status}" endpoint was
+    // removed. It let AGENT/ADMIN select any BookingStatus directly. All lifecycle
+    // changes now happen through named business actions enforced by BookingStateMachine.
 
     @GetMapping("/{bookingId}/tracking")
     public ResponseEntity<Booking> getTracking(
@@ -445,24 +448,7 @@ public ResponseEntity<Booking> technicianArrived(
                 .getId();
     }
 
-    // Expected business-validation failures (e.g. BookingService.assignTechnician
-    // rejecting a technician not approved for the booking's service mode) are
-    // signalled as ResponseStatusException so they carry the right 4xx status.
-    // Without this handler, Spring's default error page only includes the
-    // reason in the JSON body when server.error.include-message is enabled,
-    // so callers (including the Agent Assign Technician UI) could still see
-    // an unhelpful/empty response. This makes the reason explicit for every
-    // /api/bookings endpoint without touching validation logic or status codes.
-    @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<Map<String, Object>> handleBookingValidationError(ResponseStatusException exception) {
-        String message = exception.getReason() != null ? exception.getReason() : "Request could not be completed";
-        String code = "Selected service is not available for the chosen support method.".equals(message)
-                ? "SERVICE_MODE_NOT_SUPPORTED"
-                : "BOOKING_VALIDATION_FAILED";
-        return ResponseEntity.status(exception.getStatusCode()).body(Map.of(
-                "status", exception.getStatusCode().value(),
-                "code", code,
-                "message", message
-        ));
-    }
+    // PHASE 7: business failures are rendered by the central GlobalExceptionHandler using
+    // the standard ApiErrorResponse contract (the former local {status,code,message} handler
+    // was removed for a single consistent error shape).
 }

@@ -22,7 +22,7 @@ class InvoiceServiceTest {
     void setUp() {
         invoices = mock(InvoiceRepository.class);
         bookings = mock(BookingRepository.class);
-        service = new InvoiceService(invoices, bookings);
+        service = new InvoiceService(invoices, bookings, java.time.Clock.systemUTC());
     }
 
     @Test

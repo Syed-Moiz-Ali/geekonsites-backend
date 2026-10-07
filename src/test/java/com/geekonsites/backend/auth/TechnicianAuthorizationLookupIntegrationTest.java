@@ -108,7 +108,7 @@ class TechnicianAuthorizationLookupIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("jack@gos.com")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(status().reason("Invalid email or password."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid email or password."));
     }
 
     @Test
@@ -149,7 +149,7 @@ class TechnicianAuthorizationLookupIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("pending@example.com")))
                 .andExpect(status().isForbidden())
-                .andExpect(status().reason("Your technician account is awaiting approval."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Your technician account is awaiting approval."));
     }
 
     @Test
@@ -168,7 +168,7 @@ class TechnicianAuthorizationLookupIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("rejected@example.com")))
                 .andExpect(status().isForbidden())
-                .andExpect(status().reason("Your technician account is not approved. Please contact support."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Your technician account is not approved. Please contact support."));
     }
 
     @Test
@@ -182,7 +182,7 @@ class TechnicianAuthorizationLookupIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("orphaned@example.com")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(status().reason("Invalid email or password."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid email or password."));
     }
 
     @Test
@@ -201,7 +201,7 @@ class TechnicianAuthorizationLookupIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"approved@example.com\",\"password\":\"WrongPassword1!\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(status().reason("Invalid email or password."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid email or password."));
     }
 
     @Test
@@ -210,7 +210,7 @@ class TechnicianAuthorizationLookupIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("nobody@example.com")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(status().reason("Invalid email or password."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid email or password."));
     }
 
     @Test
@@ -245,6 +245,6 @@ class TechnicianAuthorizationLookupIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("admin@example.com")))
                 .andExpect(status().isForbidden())
-                .andExpect(status().reason("Use the dedicated admin portal to sign in."));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Use the dedicated admin portal to sign in."));
     }
 }

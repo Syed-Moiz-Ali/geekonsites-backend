@@ -43,8 +43,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 class TechnicianPersonalEmailMigrationSqlTest {
 
+    // PHASE 8 — the ad-hoc migration was superseded by the canonical Flyway set and
+    // moved, unchanged, to database/legacy-migrations for historical reference.
     private static final Path MIGRATION_FILE =
-            Path.of("database", "migrations", "20260824_technician_personal_email_login.sql");
+            Path.of("database", "legacy-migrations", "20260824_technician_personal_email_login.sql");
 
     @Autowired UserRepository users;
     @Autowired TechnicianRepository technicians;

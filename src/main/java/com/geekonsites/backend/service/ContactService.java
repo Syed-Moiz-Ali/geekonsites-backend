@@ -4,7 +4,9 @@ import com.geekonsites.backend.dto.ContactRequest;
 import com.geekonsites.backend.entity.ContactMessage;
 import com.geekonsites.backend.repository.ContactRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.time.LocalDateTime;
@@ -39,9 +41,18 @@ public class ContactService {
         return contactRepository.findAllByOrderByCreatedAtDesc();
     }
 
+    /** PHASE 9 — bounded, DB-side paginated operational feed. */
+    public com.geekonsites.backend.dto.PageResponse<com.geekonsites.backend.dto.ContactMessageResponse> getAllMessages(
+            org.springframework.data.domain.Pageable pageable) {
+        return com.geekonsites.backend.dto.PageResponse.of(
+                contactRepository.findAllByOrderByCreatedAtDesc(pageable),
+                com.geekonsites.backend.dto.ContactMessageResponse::from);
+    }
+
     public ContactMessage getMessageById(Long id) {
+        // PHASE 9 E2E fix: missing contact message is a 404, not a 500.
         return contactRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
     }
 
     public ContactMessage markAsRead(Long id) {

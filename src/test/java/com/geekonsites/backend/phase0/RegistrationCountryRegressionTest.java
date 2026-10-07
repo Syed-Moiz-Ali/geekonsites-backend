@@ -1,7 +1,6 @@
 package com.geekonsites.backend.phase0;
 
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -49,7 +48,6 @@ class RegistrationCountryRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(jsonPath("$.country").value("UK"));
     }
 
-    @Tag("expected-failure")
     @Test
     void unsupportedCountryIsRejectedNotSilentlyConvertedToUs() throws Exception {
         String email = "country-india-" + System.nanoTime() + "@example.com";
@@ -59,7 +57,6 @@ class RegistrationCountryRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void unknownCountryValueIsRejected() throws Exception {
         String email = "country-xyz-" + System.nanoTime() + "@example.com";
@@ -69,7 +66,6 @@ class RegistrationCountryRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void blankCountryIsRejected() throws Exception {
         String email = "country-blank-" + System.nanoTime() + "@example.com";
@@ -79,7 +75,6 @@ class RegistrationCountryRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void missingCountryIsRejected() throws Exception {
         String email = "country-null-" + System.nanoTime() + "@example.com";

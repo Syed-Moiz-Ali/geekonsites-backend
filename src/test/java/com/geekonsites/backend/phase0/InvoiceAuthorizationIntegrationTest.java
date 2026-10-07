@@ -7,7 +7,6 @@ import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,7 +34,6 @@ class InvoiceAuthorizationIntegrationTest extends Phase0IntegrationTestSupport {
         return new Tech(technician, bearer(user));
     }
 
-    @Tag("expected-failure")
     @Test
     void assignedTechnicianMustNotCreateOrMutateAnInvoice() throws Exception {
         User owner = saveUser(Role.CUSTOMER, "invoice-owner-" + System.nanoTime() + "@example.com", "US");
@@ -51,7 +49,6 @@ class InvoiceAuthorizationIntegrationTest extends Phase0IntegrationTestSupport {
                 "an unauthorized technician must not cause an invoice row to be persisted");
     }
 
-    @Tag("expected-failure")
     @Test
     void assignedTechnicianMustNotTriggerInvoiceGenerationViaBookingEndpoint() throws Exception {
         User owner = saveUser(Role.CUSTOMER, "invoice-owner-2-" + System.nanoTime() + "@example.com", "US");

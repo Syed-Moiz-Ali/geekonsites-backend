@@ -1,0 +1,1343 @@
+LOCAL E2E PROVIDER SIMULATION — COMPLETE ALL BLOCKED BUSINESS FLOWS
+
+DO NOT START PHASE 10.
+
+The previous chained live API test completed:
+
+70 live HTTP requests
+70 passed
+0 failed
+
+but the full business lifecycle was blocked because:
+
+- Stripe TEST credentials were unavailable
+- Google Calendar / Google Meet credentials were unavailable
+
+For LOCAL E2E TESTING ONLY, implement safe dummy provider adapters so we can complete the
+entire business flow through live HTTP.
+
+THIS MUST NOT BYPASS OUR REAL DOMAIN LOGIC.
+
+==================================================
+PRIMARY OBJECTIVE
+==================================================
+
+Allow this COMPLETE flow to run locally:
+
+CUSTOMER
+Register
+→ Login
+→ JWT
+→ Services
+→ Create Booking
+→ Create Payment Checkout
+→ Dummy Stripe Payment Success
+→ Booking becomes payment eligible
+
+ADMIN / AGENT
+→ Verify Technician
+→ Assign Technician
+
+TECHNICIAN
+→ Login
+→ Get Assignments
+→ Accept
+→ On The Way
+→ Location
+→ Arrived
+→ Start Service
+→ Complete Service
+
+CUSTOMER
+→ Remaining Payment if applicable
+→ Invoice
+→ Rating
+→ Notifications
+→ Refund
+
+AND ALSO:
+
+REMOTE BOOKING
+→ Payment
+→ Assignment
+→ Acceptance
+→ Dummy Google Meet provisioning
+→ Start Remote Session
+→ Complete Remote Session
+→ Invoice / Rating
+
+AND:
+
+ADVANCE + REMAINING
+→ two PaymentTransactions
+
+AND:
+
+split refund
+→ multiple PaymentRefund allocations
+
+All using LIVE HTTP against the real running Spring Boot application.
+
+==================================================
+ABSOLUTE SAFETY REQUIREMENT
+==================================================
+
+Dummy providers MUST be impossible to enable accidentally in production.
+
+Use an explicit Spring profile:
+
+local-e2e
+
+AND an explicit property:
+
+app.e2e.providers.enabled=true
+
+Both conditions should be required.
+
+Default:
+
+app.e2e.providers.enabled=false
+
+Production must NEVER activate:
+
+local-e2e
+
+Do not modify the production profile to enable any dummy implementation.
+
+Application should fail/refuse dummy provider activation if:
+
+spring.profiles.active contains prod
+
+or equivalent production profile.
+
+==================================================
+DO NOT DO THIS
+==================================================
+
+DO NOT:
+
+update PaymentTransaction.status directly from shell/SQL
+
+update Booking.paymentStatus directly
+
+update Booking.bookingStatus directly
+
+manually insert invoices
+
+manually create ratings
+
+manually mark refunds successful
+
+disable JWT
+
+permitAll protected business endpoints
+
+disable BookingStateMachine
+
+disable PaymentTransactionStateMachine
+
+disable refund state machine
+
+disable authorization
+
+reuse production Stripe secrets
+
+add fake behavior to the real Stripe implementation
+
+add permanent development shortcuts to production controllers
+
+The entire point is to test the real domain flow.
+
+==================================================
+ARCHITECTURAL PRINCIPLE
+==================================================
+
+Existing production provider abstractions should remain authoritative.
+
+REAL:
+
+PaymentService
+→ StripeCheckoutGateway
+→ Stripe
+
+LOCAL E2E:
+
+PaymentService
+→ LocalE2EStripeCheckoutGateway
+→ Dummy provider
+
+But BOTH must feed the SAME:
+
+PaymentTransaction
+PaymentTransactionStateMachine
+PaymentService finalization
+BookingStateMachine
+Invoice
+Notification
+Refund
+
+logic.
+
+Only the external provider boundary is replaced.
+
+==================================================
+PART 1 — INSPECT CURRENT PROVIDER ABSTRACTIONS
+==================================================
+
+Before coding inspect the actual implementation.
+
+At minimum:
+
+StripeCheckoutGateway
+StripeCheckoutGatewayImpl
+
+StripeRefundGateway
+StripeRefundGatewayImpl
+
+PaymentService
+
+PaymentTransactionStateMachine
+
+RefundService
+
+PaymentRefundStateMachine
+
+ExcessReversalService
+
+RemoteSessionProvisioningService
+
+Google Calendar integration
+
+RemoteSessionService
+
+ExternalSideEffectListener
+
+all provider config classes.
+
+Determine which interfaces already exist.
+
+REUSE them.
+
+Do not create duplicate payment architecture.
+
+==================================================
+PART 2 — CREATE LOCAL E2E SPRING PROFILE
+==================================================
+
+Create configuration:
+
+application-local-e2e.properties
+
+or yaml according to repository convention.
+
+This profile should:
+
+use local PostgreSQL
+
+keep Flyway enabled
+
+keep Hibernate validate
+
+enable:
+
+app.e2e.providers.enabled=true
+
+disable real outbound provider calls where dummy adapters replace them.
+
+Do NOT alter production defaults.
+
+==================================================
+PART 3 — DUMMY STRIPE CHECKOUT GATEWAY
+==================================================
+
+Implement a local-e2e implementation of:
+
+StripeCheckoutGateway
+
+or the actual current provider interface.
+
+Example name:
+
+LocalE2EStripeCheckoutGateway
+
+Activate ONLY under:
+
+@Profile("local-e2e")
+
+AND property:
+
+app.e2e.providers.enabled=true
+
+It should generate deterministic fake provider values.
+
+Example:
+
+checkout session:
+cs_e2e_<paymentTransactionId>
+
+payment intent:
+pi_e2e_<paymentTransactionId>
+
+checkout URL:
+http://localhost:<port>/internal/e2e/payments/<session>/complete
+
+expiration:
+reasonable future timestamp
+
+Do NOT use actual Stripe SDK network calls.
+
+==================================================
+PART 4 — PRESERVE REAL CHECKOUT FLOW
+==================================================
+
+Calling the NORMAL customer payment endpoint must still execute:
+
+PaymentController
+→ PaymentService.createCheckoutSession
+→ PaymentTransaction created
+→ provider gateway invoked
+→ CHECKOUT_CREATED
+→ session persisted
+
+The local provider simply supplies the external-provider response.
+
+Do not create a separate fake:
+
+POST /bookings/{id}/mark-paid
+
+endpoint.
+
+==================================================
+PART 5 — LOCAL E2E PROVIDER SIMULATION CONTROLLER
+==================================================
+
+Create a strictly local-only controller.
+
+Example namespace:
+
+/internal/e2e/provider
+
+Exact path may differ.
+
+This controller MUST exist only when:
+
+local-e2e profile
+AND
+app.e2e.providers.enabled=true
+
+Suggested operations:
+
+POST /internal/e2e/provider/payments/{checkoutSessionId}/succeed
+
+POST /internal/e2e/provider/payments/{checkoutSessionId}/expire
+
+POST /internal/e2e/provider/refunds/{paymentRefundId}/succeed
+
+POST /internal/e2e/provider/refunds/{paymentRefundId}/fail
+
+POST /internal/e2e/provider/remote/{bookingId}/provision
+
+Only implement what is needed.
+
+==================================================
+PART 6 — PROTECT LOCAL E2E CONTROLLER
+==================================================
+
+Do not make the internal simulator casually public.
+
+Require:
+
+ADMIN JWT
+
+AND optionally an E2E secret header:
+
+X-E2E-Key
+
+configured through:
+
+APP_E2E_KEY
+
+Do not hardcode the key.
+
+The flow script should send it automatically.
+
+If production profile somehow starts:
+
+the controller bean must not exist.
+
+==================================================
+PART 7 — DUMMY PAYMENT SUCCESS MUST USE REAL FINALIZATION
+==================================================
+
+Critical requirement:
+
+Dummy provider payment success must NOT do:
+
+transaction.setStatus(SUCCEEDED)
+
+booking.setPaidAmount(...)
+
+booking.setStatus(...)
+
+directly.
+
+It must construct/return the equivalent provider-confirmed state and enter the SAME internal
+finalization path used by real Stripe.
+
+Conceptually:
+
+dummy provider marks fake session as PAID
+
+→ PaymentService retrieves provider session truth
+
+→ applyCompletedCheckoutSession(...)
+
+→ PaymentTransactionStateMachine
+
+→ PaymentTransaction SUCCEEDED
+
+→ Booking aggregate recomputed
+
+→ BookingStateMachine.onPaymentConfirmed(...)
+
+→ invoice/notification/provisioning behavior
+
+Same production code path after the provider boundary.
+
+==================================================
+PART 8 — LOCAL PROVIDER SESSION STORE
+==================================================
+
+If needed, implement a small local-e2e provider session store.
+
+Prefer DB-backed or deterministic mapping if useful.
+
+At minimum fake session needs:
+
+checkoutSessionId
+paymentIntentId
+paymentTransactionId
+bookingId
+paymentType
+amountMinor
+currency
+paymentStatus
+expiresAt
+
+Do not use this as financial authority.
+
+PaymentTransaction DB remains authority.
+
+The dummy provider store only simulates what Stripe would report.
+
+==================================================
+PART 9 — PAYMENT STATES
+==================================================
+
+Support at least:
+
+OPEN / UNPAID
+
+PAID
+
+EXPIRED
+
+if needed by the real gateway contract.
+
+Calling:
+
+succeed
+
+must make subsequent provider retrieval report:
+
+payment_status = paid
+
+Then real PaymentService finalization runs.
+
+==================================================
+PART 10 — DUPLICATE SUCCESS
+==================================================
+
+Calling dummy:
+
+succeed
+
+twice must behave like Stripe replay.
+
+Expected:
+
+one successful PaymentTransaction
+
+one paid aggregate update
+
+one lifecycle transition
+
+one invoice
+
+one notification
+
+No duplicate financial effect.
+
+==================================================
+PART 11 — ADVANCE PAYMENT
+==================================================
+
+Test an ON-SITE booking using actual supported payment policy.
+
+If flow requires:
+
+ADVANCE
+
+create checkout via real PaymentController.
+
+Then call local provider simulator:
+
+succeed.
+
+Verify:
+
+PaymentTransaction type = ADVANCE
+
+real ledger row
+
+real amountMinor
+
+real Booking aggregate
+
+real lifecycle.
+
+==================================================
+PART 12 — REMAINING PAYMENT
+==================================================
+
+After service completion:
+
+create real REMAINING checkout.
+
+Then simulate provider success.
+
+Verify:
+
+second PaymentTransaction created
+
+first payment preserved
+
+second provider IDs unique
+
+paidAmountMinor exact
+
+remainingAmountMinor = 0
+
+BookingStateMachine advances correctly.
+
+==================================================
+PART 13 — FULL PAYMENT
+==================================================
+
+Also test one FULL payment path if currently supported.
+
+Verify:
+
+one PaymentTransaction
+
+full financial settlement
+
+appropriate lifecycle.
+
+==================================================
+PART 14 — DUMMY REFUND PROVIDER
+==================================================
+
+Use the existing:
+
+StripeRefundGateway
+
+boundary.
+
+Create:
+
+LocalE2EStripeRefundGateway
+
+only for local-e2e.
+
+When RefundService executes a refund:
+
+return deterministic fake provider refund ID.
+
+Example:
+
+re_e2e_<paymentRefundId>
+
+The real flow must remain:
+
+RefundRequest
+→ reserve PaymentRefund
+→ provider call
+→ PaymentRefundStateMachine
+→ RefundRequest recomputation.
+
+Do not bypass it.
+
+==================================================
+PART 15 — NORMAL REFUND FLOW
+==================================================
+
+Through live APIs:
+
+Customer creates refund request.
+
+Authorized Admin/Agent approves.
+
+Real RefundService creates PaymentRefund allocation.
+
+Dummy gateway returns success.
+
+Verify:
+
+providerRefundId
+
+SUCCEEDED
+
+exact amount
+
+request state
+
+no duplicate refund on retry.
+
+==================================================
+PART 16 — SPLIT REFUND
+==================================================
+
+Required test:
+
+ADVANCE:
+3000
+
+REMAINING:
+7000
+
+Total captured:
+10000
+
+Approved refund:
+8000
+
+Expected deterministic allocation according to current policy:
+
+7000 from newest transaction
++
+1000 from older transaction
+
+or exact actual implementation strategy.
+
+Verify TWO persisted PaymentRefund records.
+
+No direct DB mutation.
+
+==================================================
+PART 17 — EXCESS REVERSAL
+==================================================
+
+If feasible through current local provider simulation:
+
+simulate stale second capture after booking already fully settled.
+
+Real payment logic should produce:
+
+PaymentTransaction:
+SUCCEEDED
+excess=true
+
+Booking paid aggregate unchanged.
+
+Then:
+
+ExcessReversalService
+→ LocalE2EStripeRefundGateway
+→ deterministic reversal
+→ reversal SUCCEEDED.
+
+Verify duplicate retry does not create another reversal.
+
+==================================================
+PART 18 — DUMMY GOOGLE / REMOTE PROVIDER
+==================================================
+
+Inspect whether Google Calendar access already sits behind a provider abstraction.
+
+If yes:
+
+implement local provider adapter.
+
+If not:
+
+extract the smallest external-provider interface WITHOUT moving lifecycle/domain logic.
+
+Example:
+
+RemoteMeetingProvider
+
+createMeeting(...)
+
+Production:
+GoogleRemoteMeetingProvider
+
+Local:
+LocalE2ERemoteMeetingProvider
+
+Do not duplicate RemoteSessionProvisioningService.
+
+==================================================
+PART 19 — DUMMY MEETING RESPONSE
+==================================================
+
+Local provider should return deterministic values.
+
+Example:
+
+providerEventId:
+e2e-google-<bookingId>
+
+meetingUrl:
+https://meet.local.test/<bookingId>
+
+Do not contact Google.
+
+RemoteSessionProvisioningService should persist those results through the SAME production
+logic it uses for real provider response.
+
+==================================================
+PART 20 — REMOTE PROVISIONING FLOW
+==================================================
+
+Execute:
+
+REMOTE service discovery
+
+→ create booking
+
+→ payment
+
+→ assignment
+
+→ technician acceptance
+
+→ after-commit remote provisioning
+
+→ dummy provider creates meeting
+
+Verify persisted:
+
+meeting/provider ID
+
+meeting URL
+
+provisioning status
+
+No duplicate meeting if event/retry occurs twice.
+
+==================================================
+PART 21 — REMOTE SESSION FLOW
+==================================================
+
+Using actual technician/customer APIs:
+
+start remote session
+
+verify lifecycle
+
+end remote session
+
+verify:
+
+service completed
+
+technician released
+
+timestamps correct
+
+invoice/remaining-payment behavior correct.
+
+==================================================
+PART 22 — DO NOT BYPASS AFTER-COMMIT ARCHITECTURE
+==================================================
+
+Remote provisioning simulation must still be triggered through:
+
+Phase 4 after-commit event
+
+where applicable.
+
+Do not call RemoteSessionProvisioningService manually from the shell just to make it succeed
+unless testing explicit retry API.
+
+We need to test:
+
+business transaction commits
+→ event
+→ local provider
+→ persisted remote session.
+
+==================================================
+PART 23 — FAILURE SIMULATION
+==================================================
+
+Dummy providers should optionally support controlled failure.
+
+At minimum allow:
+
+payment expire
+
+refund fail
+
+remote provisioning fail
+
+Then verify recovery logic.
+
+Do NOT implement a huge fault framework.
+
+Simple e2e controls are enough.
+
+==================================================
+PART 24 — REMOTE RETRY TEST
+==================================================
+
+Configure next remote provider call to fail.
+
+Run provisioning.
+
+Verify:
+
+FAILED/retry state persisted.
+
+Then configure success.
+
+Call existing retry/recovery path.
+
+Verify:
+
+same booking
+
+one meeting
+
+successful final state.
+
+==================================================
+PART 25 — REFUND RETRY TEST
+==================================================
+
+Configure local refund provider to fail once.
+
+Approve refund.
+
+Verify:
+
+failed/pending retryable state.
+
+Then retry using actual recovery logic.
+
+Verify:
+
+same PaymentRefund/idempotency key
+
+one successful provider refund
+
+not two.
+
+==================================================
+PART 26 — UPDATE FLOW SCRIPT
+==================================================
+
+Update:
+
+scripts/local-flow-e2e.sh
+
+so provider-blocked flows now execute automatically when:
+
+SPRING_PROFILES_ACTIVE=local-e2e
+
+and:
+
+APP_E2E_KEY
+
+is available.
+
+The script should detect local simulator capability.
+
+Example:
+
+E2E_PROVIDER_MODE=local
+
+Do not require manual copying.
+
+==================================================
+PART 27 — SCRIPT CHAIN
+==================================================
+
+The full chain should now be:
+
+CUSTOMER REGISTER
+
+→ LOGIN
+
+→ CUSTOMER JWT
+
+→ GET SERVICES
+
+→ CREATE ONSITE BOOKING
+
+→ CREATE ADVANCE/FULL CHECKOUT
+
+→ EXTRACT CHECKOUT SESSION
+
+→ ADMIN JWT
+
+→ CALL LOCAL PAYMENT SUCCESS SIMULATOR
+
+→ VERIFY PAID/PARTIAL STATE
+
+→ ADMIN VERIFY TECHNICIAN
+
+→ ASSIGN
+
+→ TECHNICIAN LOGIN
+
+→ ACCEPT
+
+→ ON THE WAY
+
+→ LOCATION
+
+→ ARRIVED
+
+→ START SERVICE
+
+→ COMPLETE
+
+→ CREATE REMAINING CHECKOUT if required
+
+→ LOCAL PAYMENT SUCCESS
+
+→ INVOICE
+
+→ CUSTOMER RATING
+
+→ NOTIFICATIONS
+
+→ REFUND REQUEST
+
+→ ADMIN/AGENT APPROVAL
+
+→ DUMMY REFUND
+
+→ VERIFY REFUND
+
+Then execute REMOTE chain.
+
+==================================================
+PART 28 — FULL ON-SITE HAPPY PATH
+==================================================
+
+This MUST become fully PASS using local provider simulation.
+
+Required result:
+
+REGISTER
+PASS
+
+LOGIN
+PASS
+
+SERVICE
+PASS
+
+BOOKING
+PASS
+
+PAYMENT
+PASS
+
+TECHNICIAN APPROVAL
+PASS
+
+ASSIGNMENT
+PASS
+
+ACCEPT
+PASS
+
+ON THE WAY
+PASS
+
+TRACKING
+PASS
+
+ARRIVAL
+PASS
+
+START SERVICE
+PASS
+
+COMPLETE SERVICE
+PASS
+
+REMAINING PAYMENT
+PASS where applicable
+
+INVOICE
+PASS
+
+RATING
+PASS
+
+NOTIFICATION
+PASS
+
+REFUND
+PASS
+
+==================================================
+PART 29 — FULL REMOTE HAPPY PATH
+==================================================
+
+Required result:
+
+REGISTER/LOGIN
+PASS
+
+REMOTE SERVICE
+PASS
+
+BOOKING
+PASS
+
+PAYMENT
+PASS
+
+ASSIGNMENT
+PASS
+
+ACCEPT
+PASS
+
+REMOTE PROVISIONING
+PASS
+
+MEETING LINK
+PASS
+
+REMOTE START
+PASS
+
+REMOTE END
+PASS
+
+COMPLETION
+PASS
+
+INVOICE
+PASS
+
+RATING
+PASS
+
+==================================================
+PART 30 — VERIFY PROVIDER MODE VISIBILITY
+==================================================
+
+When local-e2e provider simulation is active, startup logs should clearly say:
+
+LOCAL E2E PAYMENT PROVIDER ACTIVE
+
+LOCAL E2E REMOTE MEETING PROVIDER ACTIVE
+
+without exposing secrets.
+
+Production startup should never show these messages.
+
+==================================================
+PART 31 — PRODUCTION SAFETY TEST
+==================================================
+
+Add automated tests proving dummy provider beans/controllers do NOT load under:
+
+default production-like profile
+
+prod
+
+Only:
+
+local-e2e + enabled property
+
+may activate them.
+
+This is mandatory.
+
+==================================================
+PART 32 — SECURITY TEST
+==================================================
+
+Without ADMIN JWT:
+
+local provider simulator endpoint must reject.
+
+Wrong E2E key:
+
+reject.
+
+Normal customer must not be able to call:
+
+simulate payment success
+
+simulate refund success
+
+simulate Google success.
+
+==================================================
+PART 33 — NO DUMMY IDENTIFIERS IN PRODUCTION PATH
+==================================================
+
+Search production configuration for:
+
+cs_e2e_
+pi_e2e_
+re_e2e_
+meet.local.test
+/internal/e2e
+
+These should exist only in local-e2e classes/tests/config.
+
+Production provider classes must remain unchanged except minimal interface extraction if needed.
+
+==================================================
+PART 34 — DATABASE VERIFICATION
+==================================================
+
+After full local E2E flow query PostgreSQL.
+
+Verify exact data.
+
+ON-SITE booking:
+
+PaymentTransactions correct
+
+Booking paidAmountMinor correct
+
+remainingAmountMinor correct
+
+technician lifecycle correct
+
+one invoice
+
+one rating
+
+refund allocations correct
+
+notifications deduplicated.
+
+REMOTE booking:
+
+payment correct
+
+meeting/session persisted
+
+completion state correct.
+
+==================================================
+PART 35 — RESTART WITH LOCAL-E2E DATABASE
+==================================================
+
+Restart backend against same local DB.
+
+Verify:
+
+Flyway stable
+
+no duplicated services
+
+no duplicated provider events
+
+no duplicate invoices
+
+no duplicate notifications
+
+existing flows readable.
+
+==================================================
+PART 36 — PRODUCTION-LIKE STARTUP
+==================================================
+
+After local E2E testing:
+
+stop local-e2e server.
+
+Start backend WITHOUT:
+
+local-e2e
+
+and with:
+
+app.e2e.providers.enabled=false
+
+Verify:
+
+dummy controllers unavailable
+
+dummy provider beans absent
+
+application still starts/configures expected real providers according to environment.
+
+If real provider credentials are absent and production-like startup legitimately requires them,
+document configuration dependency.
+
+==================================================
+PART 37 — MAVEN REGRESSION
+==================================================
+
+Run:
+
+mvn -B clean test
+
+mvn -B verify
+
+Both must remain green.
+
+Do not introduce expected-failure tags.
+
+==================================================
+PART 38 — UPDATE REPORT
+==================================================
+
+Update/create:
+
+FLOW_WISE_API_TEST_REPORT.md
+
+Add:
+
+LOCAL PROVIDER SIMULATION RESULTS
+
+Clearly mark:
+
+LOCAL DUMMY PROVIDER
+
+not real Stripe/Google.
+
+Do not claim external-provider certification.
+
+==================================================
+PART 39 — CREATE PROVIDER SIMULATION DOC
+==================================================
+
+Create:
+
+LOCAL_E2E_PROVIDER_SIMULATION.md
+
+Explain:
+
+why it exists
+
+strict local-only activation
+
+configuration
+
+how dummy Stripe works
+
+how payment success enters real PaymentService
+
+how dummy refund works
+
+how dummy Google provider works
+
+security protection
+
+how to run full flow
+
+how to disable it
+
+why it is impossible/intended to be unavailable in production
+
+==================================================
+FINAL VERDICT
+==================================================
+
+Return two separate verdicts:
+
+BACKEND BUSINESS FLOW WITH LOCAL PROVIDERS:
+PASS / FAIL
+
+REAL EXTERNAL PROVIDERS:
+NOT TESTED / PARTIALLY TESTED / TESTED
+
+Expected for current environment:
+
+BACKEND BUSINESS FLOW WITH LOCAL PROVIDERS:
+PASS
+
+REAL EXTERNAL PROVIDERS:
+NOT TESTED
+
+Do not merge these two conclusions.
+
+==================================================
+REQUIRED COMPLETION SUMMARY
+==================================================
+
+Return:
+
+LOCAL PROVIDER E2E IMPLEMENTATION SUMMARY
+
+A. Provider abstraction used
+
+B. Local Stripe checkout implementation
+
+C. Local payment-success simulation
+
+D. Local refund implementation
+
+E. Local remote-meeting implementation
+
+F. Production isolation mechanism
+
+G. Simulator security
+
+H. Full onsite flow result
+
+I. Split-payment result
+
+J. Refund result
+
+K. Split-refund result
+
+L. Remote flow result
+
+M. Failure/retry tests
+
+N. Database invariant result
+
+O. Files created/modified
+
+P. Tests added
+
+Q. Live HTTP request count
+
+R. Maven test count
+
+S. Bugs discovered/fixed
+
+T. Production-provider status
+
+U. Final verdict
+
+==================================================
+STOP CONDITION
+==================================================
+
+DO NOT START PHASE 10.
+
+After full local-provider E2E flow passes:
+
+stop
+
+give me the report
+
+and wait for review.

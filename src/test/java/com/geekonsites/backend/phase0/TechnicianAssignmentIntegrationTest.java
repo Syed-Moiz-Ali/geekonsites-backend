@@ -7,7 +7,6 @@ import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,7 +52,6 @@ class TechnicianAssignmentIntegrationTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
-    @Tag("expected-failure")
     @Test
     void completedBookingCannotBeAssigned() throws Exception {
         User agent = agent();
@@ -66,7 +64,6 @@ class TechnicianAssignmentIntegrationTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void cancelledBookingCannotBeAssigned() throws Exception {
         User agent = agent();
@@ -79,7 +76,6 @@ class TechnicianAssignmentIntegrationTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void reassigningTechnicianMustReleaseThePreviousTechnician() throws Exception {
         User agent = agent();

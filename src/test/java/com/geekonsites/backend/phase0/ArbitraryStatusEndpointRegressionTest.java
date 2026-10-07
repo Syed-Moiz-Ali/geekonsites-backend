@@ -6,7 +6,6 @@ import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -28,7 +27,6 @@ class ArbitraryStatusEndpointRegressionTest extends Phase0IntegrationTestSupport
         return saveUser(Role.AGENT, "status-agent-" + System.nanoTime() + "@geekonsites.com", "US");
     }
 
-    @Tag("expected-failure")
     @Test
     void agentCannotForceUnpaidBookingStraightToCompleted() throws Exception {
         User agent = agent();
@@ -39,7 +37,6 @@ class ArbitraryStatusEndpointRegressionTest extends Phase0IntegrationTestSupport
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void agentCannotSetAnArbitraryStatusOnAnAlreadyCompletedBooking() throws Exception {
         User agent = agent();

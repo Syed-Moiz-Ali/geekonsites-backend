@@ -176,9 +176,9 @@ public class EmailService {
 
                 Best regards,
                 GeekOnSites Support Team
-                support@geekonsites.com
+                %s
                 https://geekonsites.com
-                """.formatted(contact.getFullName());
+                """.formatted(contact.getFullName(), supportAddress);
     }
 
     private String passwordResetHtml(String resetLink) {
@@ -236,8 +236,8 @@ public class EmailService {
                 <a href="%s" style="display:inline-block;background:#092b4c;color:#fff;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:7px">Set Your Password</a>
                 <p style="font-size:12px;color:#6b7c8a">This link expires in 24 hours and can only be used once.</p>
                 <p>After setting your password, sign in at <a href="https://geekonsites.com/technician-login">GeekOnSites Technician Login</a>.</p>
-                <p>If you did not submit this application, contact support@geekonsites.com.</p>
+                <p>If you did not submit this application, contact %s.</p>
                 <p>GeekOnSites<br>A service by ASI TECH INC</p></div></div></body></html>
-                """.formatted(name, companyEmail, setupLink);
+                """.formatted(name, companyEmail, setupLink, supportAddress);
     }
 }

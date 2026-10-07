@@ -116,7 +116,7 @@ class TechnicianOnboardingServiceTest {
         assertTrue(encoder.matches("SecurePass1!", user.getPassword()));
         assertTrue(token.isUsed());
         verify(technicians).markPasswordSetupComplete(eq(1L), any(Instant.class));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.setOnboardingPassword(new TechnicianSetPasswordRequest("raw-token", "SecurePass1!")));
     }
 
@@ -124,9 +124,10 @@ class TechnicianOnboardingServiceTest {
     void expiredTokenIsRejected() {
         TechnicianOnboardingToken token = token(user("rahul@gos.com"), Instant.now().minusSeconds(1), false);
         when(tokens.findByTokenHash(sha256("expired"))).thenReturn(Optional.of(token));
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        org.springframework.web.server.ResponseStatusException exception =
+                assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.setOnboardingPassword(new TechnicianSetPasswordRequest("expired", "SecurePass1!")));
-        assertTrue(exception.getMessage().contains("expired"));
+        assertTrue(exception.getReason().contains("expired"));
         assertTrue(token.isUsed());
     }
 
@@ -136,7 +137,7 @@ class TechnicianOnboardingServiceTest {
         when(tokens.findByTokenHash(sha256("raw-token"))).thenReturn(Optional.of(token));
         when(technicians.existsByIdAndVerificationStatus(1L, "APPROVED")).thenReturn(false);
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.setOnboardingPassword(new TechnicianSetPasswordRequest("raw-token", "SecurePass1!")));
         verify(users, never()).save(any());
     }

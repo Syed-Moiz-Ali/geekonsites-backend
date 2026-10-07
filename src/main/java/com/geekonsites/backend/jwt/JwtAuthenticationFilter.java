@@ -1,5 +1,7 @@
 package com.geekonsites.backend.jwt;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geekonsites.backend.dto.ApiErrorResponse;
 import com.geekonsites.backend.entity.User;
 import com.geekonsites.backend.repository.UserRepository;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -16,6 +18,8 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -23,6 +27,7 @@ public class JwtAuthenticationFilter extends org.springframework.web.filter.Once
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     
     @Override
@@ -73,14 +78,26 @@ public class JwtAuthenticationFilter extends org.springframework.web.filter.Once
 
         } catch (ExpiredJwtException e) {
             SecurityContextHolder.clearContext();
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"JWT expired. Please login again.\"}");
+            writeUnauthorized(request, response, "JWT expired. Please login again.");
         } catch (JwtException | IllegalArgumentException e) {
             SecurityContextHolder.clearContext();
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"Invalid JWT token. Please login again.\"}");
+            writeUnauthorized(request, response, "Invalid JWT token. Please login again.");
         }
+    }
+
+    // PHASE 7: 401 responses use the standard ApiErrorResponse contract (no parser internals).
+    private void writeUnauthorized(HttpServletRequest request, HttpServletResponse response, String message)
+            throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        ApiErrorResponse body = new ApiErrorResponse(
+                LocalDateTime.now().toString(),
+                HttpServletResponse.SC_UNAUTHORIZED,
+                "Unauthorized",
+                "UNAUTHORIZED",
+                message,
+                request.getRequestURI(),
+                List.of());
+        objectMapper.writeValue(response.getWriter(), body);
     }
 }

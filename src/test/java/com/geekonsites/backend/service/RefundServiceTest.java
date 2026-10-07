@@ -3,11 +3,17 @@ package com.geekonsites.backend.service;
 import com.geekonsites.backend.dto.AdminRefundDecisionDto;
 import com.geekonsites.backend.dto.RefundRequestCreateDto;
 import com.geekonsites.backend.entity.Booking;
+import com.geekonsites.backend.entity.PaymentRefund;
+import com.geekonsites.backend.entity.PaymentTransaction;
 import com.geekonsites.backend.entity.RefundRequest;
 import com.geekonsites.backend.entity.User;
+import com.geekonsites.backend.enums.PaymentProvider;
+import com.geekonsites.backend.enums.PaymentType;
 import com.geekonsites.backend.enums.RefundStatus;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.repository.BookingRepository;
+import com.geekonsites.backend.repository.PaymentRefundRepository;
+import com.geekonsites.backend.repository.PaymentTransactionRepository;
 import com.geekonsites.backend.repository.RefundRequestRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +31,8 @@ class RefundServiceTest {
     private BookingRepository bookings;
     private StripeRefundGateway stripe;
     private EmailService email;
+    private PaymentTransactionRepository transactions;
+    private PaymentRefundRepository paymentRefunds;
     private RefundService service;
 
     @BeforeEach
@@ -33,9 +41,20 @@ class RefundServiceTest {
         bookings = mock(BookingRepository.class);
         stripe = mock(StripeRefundGateway.class);
         email = mock(EmailService.class);
-        service = new RefundService(refunds, bookings, new RefundRuleEngine(), stripe, email);
+        transactions = mock(PaymentTransactionRepository.class);
+        paymentRefunds = mock(PaymentRefundRepository.class);
+        service = new RefundService(refunds, bookings, new RefundRuleEngine(), stripe, email, transactions, paymentRefunds,
+                new PaymentRefundStateMachine(), testTransactionManager());
         when(refunds.save(any())).thenAnswer(call -> { RefundRequest value = call.getArgument(0); if (value.getId() == null) value.setId(10L); return value; });
         when(refunds.findAllByOrderByRequestedAtDesc()).thenReturn(List.of());
+        when(transactions.findByBookingIdAndStatusOrderByCreatedAtAsc(anyLong(), any()))
+                .thenReturn(List.of(transaction(500L, 10000L)));
+        when(paymentRefunds.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(paymentRefunds.sumSucceededAmountMinorByRefundRequestId(anyLong())).thenReturn(0L);
+        when(paymentRefunds.sumActiveAmountMinorByPaymentTransactionId(anyLong())).thenReturn(0L);
+        when(paymentRefunds.findByRefundRequestIdAndPaymentTransactionId(anyLong(), anyLong()))
+                .thenReturn(Optional.empty());
+        when(refunds.findByIdForUpdate(anyLong())).thenAnswer(call -> refunds.findById(call.getArgument(0)));
     }
 
     @Test
@@ -86,13 +105,15 @@ class RefundServiceTest {
         RefundRequest full = refund(100);
         when(refunds.findById(10L)).thenReturn(Optional.of(full));
         when(bookings.findById(1L)).thenReturn(Optional.of(booking(1L, 7L, "US", "USD", 100)));
-        when(stripe.refund(any(), eq(new BigDecimal("100.00")), anyString())).thenReturn(new StripeRefundGateway.StripeRefundResult("pi_1", "re_full", "succeeded"));
+        when(stripe.refundPaymentTransaction(any(PaymentTransaction.class), eq(10000L), anyString()))
+                .thenReturn(new StripeRefundGateway.StripeRefundResult("pi_1", "re_full", "succeeded"));
         assertEquals(RefundStatus.REFUNDED, service.approveAndExecute(10L, decision("100.00"), user(99L, Role.ADMIN)).getRefundStatus());
 
         RefundRequest partial = refund(100);
         partial.setId(11L);
         when(refunds.findById(11L)).thenReturn(Optional.of(partial));
-        when(stripe.refund(any(), eq(new BigDecimal("40.00")), anyString())).thenReturn(new StripeRefundGateway.StripeRefundResult("pi_1", "re_partial", "succeeded"));
+        when(stripe.refundPaymentTransaction(any(PaymentTransaction.class), eq(4000L), anyString()))
+                .thenReturn(new StripeRefundGateway.StripeRefundResult("pi_1", "re_partial", "succeeded"));
         assertEquals(RefundStatus.PARTIALLY_REFUNDED, service.approveAndExecute(11L, decision("40.00"), user(99L, Role.ADMIN)).getRefundStatus());
     }
 
@@ -101,11 +122,30 @@ class RefundServiceTest {
         RefundRequest refund = refund(100);
         when(refunds.findById(10L)).thenReturn(Optional.of(refund));
         when(bookings.findById(1L)).thenReturn(Optional.of(booking(1L, 7L, "US", "USD", 100)));
-        when(stripe.refund(any(), any(), anyString())).thenThrow(new RuntimeException("Stripe unavailable"));
+        when(stripe.refundPaymentTransaction(any(PaymentTransaction.class), anyLong(), anyString()))
+                .thenThrow(new RuntimeException("Stripe unavailable"));
         assertThrows(RuntimeException.class, () -> service.approveAndExecute(10L, decision("50.00"), user(99L, Role.ADMIN)));
         assertEquals(RefundStatus.FAILED, refund.getRefundStatus());
         assertNotNull(refund.getFailureReason());
         verify(refunds, atLeast(2)).save(refund);
+    }
+
+    private org.springframework.transaction.PlatformTransactionManager testTransactionManager() {
+        org.springframework.transaction.PlatformTransactionManager tm =
+                mock(org.springframework.transaction.PlatformTransactionManager.class);
+        when(tm.getTransaction(any())).thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+        return tm;
+    }
+
+    private PaymentTransaction transaction(Long id, long amountMinor) {
+        PaymentTransaction transaction = new PaymentTransaction();
+        transaction.setId(id);
+        transaction.setBookingId(1L);
+        transaction.setPaymentType(PaymentType.ADVANCE);
+        transaction.setProvider(PaymentProvider.STRIPE);
+        transaction.setAmountMinor(amountMinor);
+        transaction.setCurrency("USD");
+        return transaction;
     }
 
     private RefundRequest refund(double maximum) {

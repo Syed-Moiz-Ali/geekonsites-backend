@@ -6,7 +6,6 @@ import com.geekonsites.backend.entity.User;
 import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -47,7 +46,6 @@ class TrackingLifecycleRegressionTest extends Phase0IntegrationTestSupport {
                 + "}";
     }
 
-    @Tag("expected-failure")
     @Test
     void aLocationUpdateMustNotImplicitlyAcceptAnAssignedJob() throws Exception {
         Actor actor = assignedTechnician();
@@ -62,7 +60,6 @@ class TrackingLifecycleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(jsonPath("$.bookingStatus").value("TECHNICIAN_ASSIGNED"));
     }
 
-    @Tag("expected-failure")
     @Test
     void aLocationUpdateMustNotRegressArrivedBackToOnTheWay() throws Exception {
         Actor actor = assignedTechnician();
@@ -77,7 +74,6 @@ class TrackingLifecycleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(jsonPath("$.bookingStatus").value("TECHNICIAN_ARRIVED"));
     }
 
-    @Tag("expected-failure")
     @Test
     void aLocationUpdateMustNotMutateACompletedBooking() throws Exception {
         Actor actor = assignedTechnician();
@@ -91,7 +87,6 @@ class TrackingLifecycleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void aLocationUpdateMustNotMutateAClosedBooking() throws Exception {
         Actor actor = assignedTechnician();
@@ -105,7 +100,6 @@ class TrackingLifecycleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void aLocationUpdateMustNotMutateACancelledBooking() throws Exception {
         Actor actor = assignedTechnician();
@@ -119,7 +113,6 @@ class TrackingLifecycleRegressionTest extends Phase0IntegrationTestSupport {
                 .andExpect(status().is4xxClientError());
     }
 
-    @Tag("expected-failure")
     @Test
     void outOfRangeCoordinatesMustBeRejected() throws Exception {
         Actor actor = assignedTechnician();

@@ -1,5 +1,6 @@
 package com.geekonsites.backend.entity;
 
+import com.geekonsites.backend.service.PaymentMoney;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -29,9 +30,20 @@ public class Invoice {
 
     private String serviceType;
 
+    // PHASE 8 — exact minor-unit authority (migration V3); Double is a deprecated mirror.
+    private Long amountMinor;
+    private Long paidAmountMinor;
+
+    @Deprecated
     private Double amount;
 
     private String currency;
+
+    // PHASE 8 — keep the exact minor value and its deprecated Double mirror in sync.
+    public void setAmountMinor(Long value) { this.amountMinor = value; this.amount = value == null ? null : PaymentMoney.toMajor(value); }
+    public void setPaidAmountMinor(Long value) { this.paidAmountMinor = value; this.paidAmount = value == null ? null : PaymentMoney.toMajor(value); }
+    public void setAmount(Double value) { this.amount = value; this.amountMinor = PaymentMoney.toMinor(value); }
+    public void setPaidAmount(Double value) { this.paidAmount = value; this.paidAmountMinor = PaymentMoney.toMinor(value); }
 
     private String paymentStatus;
 
@@ -39,6 +51,7 @@ public class Invoice {
 
     private String paymentTransactionId;
 
+    @Deprecated
     private Double paidAmount;
 
     private LocalDateTime issuedAt;
@@ -46,5 +59,7 @@ public class Invoice {
     @PrePersist
     void onCreate() {
         if (issuedAt == null) issuedAt = LocalDateTime.now();
+        if (amountMinor == null) amountMinor = PaymentMoney.toMinor(amount);
+        if (paidAmountMinor == null) paidAmountMinor = PaymentMoney.toMinor(paidAmount);
     }
 }

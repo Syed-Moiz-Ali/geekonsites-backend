@@ -6,7 +6,6 @@ import com.geekonsites.backend.enums.BookingStatus;
 import com.geekonsites.backend.enums.Role;
 import com.geekonsites.backend.enums.ServiceMode;
 import com.geekonsites.backend.support.Phase0IntegrationTestSupport;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -14,18 +13,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * PHASE 0 — payment security contract.
+ * PHASE 1 — payment security contract.
  *
- * <p>Audit C2 / BUG-02: the manual {@code payment-success} and
- * {@code remaining-payment-success} endpoints accept a caller-supplied transaction id
- * and mark a booking paid without any Stripe verification. The client architecture
- * requires payment state to originate only from verified Stripe processing.
- *
- * <p>These tests assert the required contract (a supplied transaction id must NOT be
- * able to move an unpaid booking to paid) and currently fail. Amount mismatch,
- * currency mismatch, wrong booking metadata and duplicate-webhook idempotency are
- * already covered by {@code service/PaymentServiceTest} and are deliberately not
- * duplicated here.
+ * <p>Audit C2 / BUG-02: the legacy manual {@code /payment-success} and
+ * {@code /remaining-payment-success} endpoints accepted a caller-supplied transaction
+ * id and marked a booking paid without Stripe verification. Phase 1 removed those
+ * endpoints; payment state can now only change through the verified Stripe webhook or
+ * the authenticated {@code confirm-checkout-session} fallback. These tests assert that
+ * a supplied transaction id can no longer mark an unpaid booking paid.
  */
 class PaymentSecurityRegressionTest extends Phase0IntegrationTestSupport {
 
@@ -33,7 +28,6 @@ class PaymentSecurityRegressionTest extends Phase0IntegrationTestSupport {
         return saveUser(Role.ADMIN, "payment-admin-" + System.nanoTime() + "@geekonsites.com", "US");
     }
 
-    @Tag("expected-failure")
     @Test
     void suppliedTransactionIdMustNotMarkAnUnpaidBookingPaid() throws Exception {
         User admin = admin();
@@ -48,7 +42,6 @@ class PaymentSecurityRegressionTest extends Phase0IntegrationTestSupport {
                 "an unverified transaction id must never move a booking to PAID");
     }
 
-    @Tag("expected-failure")
     @Test
     void suppliedTransactionIdMustNotSettleRemainingBalanceWithoutStripe() throws Exception {
         User admin = admin();
